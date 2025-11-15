@@ -3,6 +3,8 @@ open GodmorgenBotFSharp
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
+open Microsoft.Extensions.Logging
+open MongoDB.Driver
 open NetCord
 open NetCord.Gateway
 open NetCord.Hosting.Gateway
@@ -21,6 +23,13 @@ let builder =
 let host = builder.Build ()
 
 let gatewayClient = host.Services.GetRequiredService<GatewayClient> ()
+let loggerFactory = host.Services.GetRequiredService<ILoggerFactory>()
+let logger = loggerFactory.CreateLogger("GodmorgenBot")
+let configuration = host.Services.GetRequiredService<IConfiguration>()
+let mongoConnectionString = configuration.GetConnectionString("MongoDb")
+
+let mongoClient = new MongoClient(mongoConnectionString)
+let database = mongoClient.GetDatabase("godmorgen")
 
 gatewayClient.add_MessageCreate (fun message ->
     task {
