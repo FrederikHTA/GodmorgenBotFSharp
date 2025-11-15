@@ -1,0 +1,49 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{fs,fsx}]
+# General style:
+fsharp_multiline_bracket_style = stroustrup
+fsharp_multi_line_lambda_closing_newline = true
+fsharp_keep_max_number_of_blank_lines = 5
+fsharp_record_multiline_formatter = number_of_items
+# Extra spaces (for consistency):
+fsharp_space_before_class_constructor = true
+fsharp_space_before_colon = true
+fsharp_space_before_member = true
+fsharp_space_before_semicolon = true
+fsharp_space_before_uppercase_invocation = true
+# Line lengths:
+max_line_length = 180
+fsharp_max_array_or_list_width = 120
+fsharp_max_function_binding_width = 10 # use multiline definitions except for very small bodies, e.g. 'jsNative'
+fsharp_max_if_then_else_short_width = 80
+fsharp_max_infix_operator_expression = 120
+fsharp_max_value_binding_width = 120
+
+[*.yml]
+indent_size = 2
+
+[*.md]
+max_line_length = 1000000
+indent_size = 3
+
+[*.{xml,fsproj,csproj,props}]
+ij_xml_space_inside_empty_tag = true # match Rider's auto generating behaviour
+
+[*.sql]
+ij_sql_keyword_case = 2
+ij_sql_type_case = 2
+ij_sql_built_in_case = 2
+
+[*.cs]
+max_line_length = 100
