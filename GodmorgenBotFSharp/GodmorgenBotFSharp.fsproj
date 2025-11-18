@@ -7,10 +7,10 @@
 
     <ItemGroup>
         <Compile Include="Context.fs" />
-        <Compile Include="MongoDb.fs" />
+        <Compile Include="MongoDb\Types.fs" />
         <Compile Include="SlashCommands.fs" />
         <Compile Include="MessageHandler.fs" />
-        <Compile Include="BackgroundTaskTest.fs" />
+        <Compile Include="BackgroundJob.fs" />
         <Compile Include="Program.fs"/>
         <Content Include="appsettings.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

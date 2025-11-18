@@ -19,9 +19,20 @@ let builder =
         )
         .ConfigureServices (fun hostBuilderContext serviceCollection ->
             serviceCollection.AddLogging () |> ignore
-            serviceCollection.AddHostedService<BackgroundTaskTest.BackgroundWorker> () |> ignore
             serviceCollection.AddDiscordGateway () |> ignore
             serviceCollection.AddApplicationCommands () |> ignore
+
+            let config = hostBuilderContext.Configuration
+            let mongoConnectionString = config.GetConnectionString "MongoDb"
+            let mongoDb = MongoDb.Types.create mongoConnectionString
+
+            serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun x ->
+                let loggerFactory = x.GetRequiredService<ILoggerFactory> ()
+                let gatewayClient = x.GetRequiredService<GatewayClient> ()
+                let logger = loggerFactory.CreateLogger<BackgroundJob.HereticBackgroundJob> ()
+                new BackgroundJob.HereticBackgroundJob (gatewayClient, mongoDb, logger)
+            )
+            |> ignore
         )
 
 let host = builder.Build ()
@@ -31,7 +42,7 @@ let configuration = host.Services.GetRequiredService<IConfiguration> ()
 let mongoConnectionString = configuration.GetConnectionString "MongoDb"
 
 let ctx = {
-    MongoDataBase = MongoDb.create mongoConnectionString
+    MongoDataBase = MongoDb.Types.create mongoConnectionString
     Logger = loggerFactory.CreateLogger "GodmorgenBot"
 }
 
@@ -40,6 +51,12 @@ gatewayClient.add_MessageCreate (MessageHandler.messageCreate ctx)
 type Delegate = delegate of User -> string
 let delegateFunc = Delegate (fun user -> $"Pong! <@{user.Id}>")
 host.AddSlashCommand ("ping", "Replies with Pong!", SlashCommands.pingCommand) |> ignore
-host.AddSlashCommand ("ping", "Replies with Pong!", SlashCommands.leaderboardCommand) |> ignore
+
+host.AddSlashCommand (
+    "leaderboard",
+    "This command shows the current leaderboard status",
+    SlashCommands.leaderboardCommand ctx
+)
+|> ignore
 
 host.RunAsync () |> Async.AwaitTask |> Async.RunSynchronously
