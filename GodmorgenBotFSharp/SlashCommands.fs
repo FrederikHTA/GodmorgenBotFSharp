@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open GodmorgenBotFSharp.MongoDb.Types
 open MongoDB.Driver
 open Microsoft.Extensions.Logging
+open NetCord.Gateway
 
 type LeaderboardDelegate = delegate of unit -> Task<string>
 
@@ -77,12 +78,13 @@ let giveUserPointCommand (ctx : Context) =
     GiveUserPointDelegate (fun user ->
         task {
             try
-            if user.Id <> Constants.PuffyDiscordUserId then
-                return "You are not allowed to use this command, Heretic!"
-            else
-                let! result = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint user
+                if user.Id <> Constants.PuffyDiscordUserId then
+                    return "You are not allowed to use this command, Heretic!"
+                else
+                    let! result = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint user
 
-                return $"User <@{user.Id}> has been given a point from {result.Previous} to {result.Current} points!"
+                    return
+                        $"User <@{user.Id}> has been given a point from {result.Previous} to {result.Current} points!"
             with ex ->
                 ctx.Logger.LogError (ex, "Error in GiveUserPoint for user {User}. ", user.Username)
                 return "An error occurred while processing your request."
@@ -113,9 +115,9 @@ let topWordsCommand (ctx : Context) =
         }
     )
 
-type AllTimeLeaderboardDelegate = delegate of unit -> Task<string array>
+type AllTimeLeaderboardDelegate = delegate of unit -> Task<string>
 
-let allTimeLeaderboardCommand (ctx : Context) =
+let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
     AllTimeLeaderboardDelegate (fun _ ->
         task {
             try
@@ -125,7 +127,7 @@ let allTimeLeaderboardCommand (ctx : Context) =
                 let! godmorgenStats = MongoDb.Functions.getGodmorgenStats filter ctx.MongoDataBase
 
                 if Array.isEmpty godmorgenStats then
-                    return [| "No one has said godmorgen yet." |]
+                    return "No one has said godmorgen yet."
                 else
                     let monthlyLeaderboard = Leaderboard.getMonthlyLeaderboard godmorgenStats
                     let overallRankings = Leaderboard.getOverallRankings godmorgenStats
@@ -139,11 +141,13 @@ let allTimeLeaderboardCommand (ctx : Context) =
                             + String.concat "\n" monthlyRank.Rankings
                         )
 
-                    let overallRankingMessage = $"Overall Ranking:\n{overallRankings}"
+                    for monthlyMessage in monthlyMessages do
+                        let! _ = gatewayClient.Rest.SendMessageAsync(ctx.DiscordChannelInfo.ChannelId, monthlyMessage)
+                        ()
 
-                    return Array.append monthlyMessages [| overallRankingMessage |]
+                    return $"Overall Ranking:\n{overallRankings}"
             with ex ->
                 ctx.Logger.LogError (ex, "Error in GetAllTimeLeaderboard.")
-                return [| "An error occurred while processing your request." |]
+                return "An error occurred while processing your request."
         }
     )

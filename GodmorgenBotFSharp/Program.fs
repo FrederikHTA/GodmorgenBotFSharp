@@ -12,8 +12,7 @@ let builder =
     Host
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun context config -> //
-            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true)
-            |> ignore
+            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true) |> ignore
         )
         .ConfigureServices (fun hostBuilderContext serviceCollection ->
             serviceCollection.AddLogging () |> ignore
@@ -28,12 +27,14 @@ let builder =
                 let loggerFactory = x.GetRequiredService<ILoggerFactory> ()
                 let gatewayClient = x.GetRequiredService<GatewayClient> ()
                 let configuration = x.GetRequiredService<IConfiguration> ()
+
                 let discordChannelInfo = {
                     ChannelId = configuration.GetValue<uint64> "ChannelId"
                     GuildId = configuration.GetValue<uint64> "GuildId"
                 }
+
                 let logger = loggerFactory.CreateLogger<BackgroundJob.HereticBackgroundJob> ()
-                new BackgroundJob.HereticBackgroundJob (gatewayClient,discordChannelInfo, mongoDb, logger)
+                new BackgroundJob.HereticBackgroundJob (gatewayClient, discordChannelInfo, mongoDb, logger)
             )
             |> ignore
         )
@@ -47,12 +48,13 @@ let mongoConnectionString = configuration.GetConnectionString "MongoDb"
 let ctx = {
     MongoDataBase = MongoDb.Functions.create mongoConnectionString
     Logger = loggerFactory.CreateLogger "GodmorgenBot"
+    DiscordChannelInfo = {
+        ChannelId = configuration.GetValue<uint64> "ChannelId"
+        GuildId = configuration.GetValue<uint64> "GuildId"
+    }
 }
 
 gatewayClient.add_MessageCreate (MessageHandler.messageCreate ctx)
-
-type Delegate = delegate of User -> string
-let delegateFunc = Delegate (fun user -> $"Pong! <@{user.Id}>")
 
 host.AddSlashCommand (
     "leaderboard",
@@ -82,18 +84,14 @@ host.AddSlashCommand (
 )
 |> ignore
 
-host.AddSlashCommand (
-    "topwords",
-    "This command shows top 5 words for a given user",
-    SlashCommands.topWordsCommand ctx
-)
+host.AddSlashCommand ("topwords", "This command shows top 5 words for a given user", SlashCommands.topWordsCommand ctx)
 |> ignore
 
-// host.AddSlashCommand (
-//     "alltimeleaderboard",
-//     "This command shows the all time leaderboard, and stats for the last 3 months.",
-//     SlashCommands.allTimeLeaderboardCommand ctx
-// )
-// |> ignore
+host.AddSlashCommand (
+    "alltimeleaderboard",
+    "This command shows the all time leaderboard, and stats for the last 3 months.",
+    SlashCommands.allTimeLeaderboardCommand ctx gatewayClient
+)
+|> ignore
 
 host.RunAsync () |> Async.AwaitTask |> Async.RunSynchronously

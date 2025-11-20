@@ -11,4 +11,5 @@ type DiscordChannelInfo = {
 type Context = {
     MongoDataBase: IMongoDatabase
     Logger: ILogger
+    DiscordChannelInfo: DiscordChannelInfo
 }
