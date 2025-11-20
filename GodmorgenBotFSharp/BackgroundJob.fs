@@ -26,8 +26,7 @@ let isValidGodMorgenMessage (message : string) =
     let parts = message.ToLowerInvariant().Split (' ', StringSplitOptions.RemoveEmptyEntries)
 
     match parts with
-    | [| first ; second |] when first.Length > 0 && second.Length > 0 ->
-        first[0] = 'g' && second[0] = 'm'
+    | [| first ; second |] when first.Length > 0 && second.Length > 0 -> first[0] = 'g' && second[0] = 'm'
     | _ -> false
 
 let findAndDisgraceHeretics
@@ -45,9 +44,7 @@ let findAndDisgraceHeretics
         else
             // build a single message mentioning all heretics and send it via REST
             let mentions =
-                hereticUserIds
-                |> Array.map (fun discordUserId -> $"<@%d{discordUserId}>")
-                |> String.concat ", "
+                hereticUserIds |> Array.map (fun discordUserId -> $"<@%d{discordUserId}>") |> String.concat ", "
 
             let message = $"User(s) found guilty of heresy: %s{mentions}"
 
@@ -67,8 +64,7 @@ let callbackFunction
         let dateTime = DateTime.UtcNow
 
         if dateTime |> isWeekend || dateTime |> isEndOfGodMorgenHoursAt |> not then
-            logger.LogInformation
-                "Not within godmorgen hours or it's weekend, skipping heresy check."
+            logger.LogInformation "Not within godmorgen hours or it's weekend, skipping heresy check."
         else
             do! findAndDisgraceHeretics gatewayClient discordChannelInfo mongoDb logger
     }
