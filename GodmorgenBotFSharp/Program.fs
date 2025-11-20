@@ -29,8 +29,13 @@ let builder =
             serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun x ->
                 let loggerFactory = x.GetRequiredService<ILoggerFactory> ()
                 let gatewayClient = x.GetRequiredService<GatewayClient> ()
+                let configuration = x.GetRequiredService<IConfiguration> ()
+                let discordChannelInfo = {
+                    ChannelId = configuration.GetValue<uint64> "ChannelId"
+                    GuildId = configuration.GetValue<uint64> "GuildId"
+                }
                 let logger = loggerFactory.CreateLogger<BackgroundJob.HereticBackgroundJob> ()
-                new BackgroundJob.HereticBackgroundJob (gatewayClient, mongoDb, logger)
+                new BackgroundJob.HereticBackgroundJob (gatewayClient,discordChannelInfo, mongoDb, logger)
             )
             |> ignore
         )

@@ -76,22 +76,21 @@ let getGodmorgenStats
 
 let getHereticUserIds (mongoDatabase : IMongoDatabase) =
     async {
-        let! godmorgenStats =
-            mongoDatabase
-                .GetCollection<GodmorgenStats>(godmorgenStatsCollectionName)
-                .Find(fun stats ->
-                    stats.Month = DateTime.Today.Month
-                    && stats.Year = DateTime.Today.Year
-                    && stats.LastGoodmorgenDate < DateTimeOffset DateTimeOffset.UtcNow.Date
-                )
-                .ToListAsync ()
+        let collection = mongoDatabase.GetCollection<GodmorgenStats> godmorgenStatsCollectionName
+        let today = DateTime.UtcNow.Date
+        let currentMonth = today.Month
+        let currentYear = today.Year
+
+        let! messages =
+            collection.Find (fun msg ->
+                msg.Month = currentMonth &&
+                msg.Year = currentYear
+            )
+            |> fun cursor -> cursor.ToListAsync ()
             |> Async.AwaitTask
 
-        let distinctHeretics =
-            godmorgenStats
-            |> Seq.distinctBy _.DiscordUserId
-            |> Seq.sortByDescending _.Id
-            |> Seq.toArray
-
-        return distinctHeretics
+        return messages
+               |> Seq.filter(fun x -> x.LastGoodmorgenDate < DateTimeOffset(today))
+               |> Seq.map _.DiscordUserId //
+               |> Seq.distinct |> Array.ofSeq
     }

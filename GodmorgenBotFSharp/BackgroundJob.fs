@@ -32,6 +32,7 @@ let isValidGodMorgenMessage (message : string) =
 
 let findAndDisgraceHeretics
     (gatewayClient : GatewayClient)
+    (discordChannelInfo : DiscordChannelInfo)
     (mongoDb : IMongoDatabase)
     (logger : ILogger)
     =
@@ -42,31 +43,44 @@ let findAndDisgraceHeretics
         if hereticUserIds.Length = 0 then
             logger.LogInformation "No heretics found."
         else
-            // TODO: Figure out how to write in a channel without getting an initial message hook
-            for heretic in hereticUserIds do
-                logger.LogInformation (
-                    "User {DiscordUserId} has been found guilty of heresy!",
-                    heretic.DiscordUserId
-                )
+            // build a single message mentioning all heretics and send it via REST
+            let mentions =
+                hereticUserIds
+                |> Array.map (fun discordUserId -> $"<@%d{discordUserId}>")
+                |> String.concat ", "
+
+            let message = $"User(s) found guilty of heresy: %s{mentions}"
+
+            do!
+                gatewayClient.Rest.SendMessageAsync (discordChannelInfo.ChannelId, message)
+                |> Async.AwaitTask
+                |> Async.Ignore
     }
 
-let callbackFunction (gatewayClient : GatewayClient) (mongoDb : IMongoDatabase) (logger : ILogger) =
+let callbackFunction
+    (gatewayClient : GatewayClient)
+    (discordChannelInfo : DiscordChannelInfo)
+    (mongoDb : IMongoDatabase)
+    (logger : ILogger)
+    =
     async {
         let dateTime = DateTime.UtcNow
 
         if dateTime |> isWeekend || dateTime |> isEndOfGodMorgenHoursAt |> not then
-            () // do nothing
-
             logger.LogInformation
                 "Not within godmorgen hours or it's weekend, skipping heresy check."
         else
-            do! findAndDisgraceHeretics gatewayClient mongoDb logger
+            do! findAndDisgraceHeretics gatewayClient discordChannelInfo mongoDb logger
     }
     |> Async.RunSynchronously
 
 type HereticBackgroundJob
-    (gatewayClient : GatewayClient, mongoDb : IMongoDatabase, logger : ILogger<HereticBackgroundJob>)
-    =
+    (
+        gatewayClient : GatewayClient,
+        discordChannelInfo : DiscordChannelInfo,
+        mongoDb : IMongoDatabase,
+        logger : ILogger<HereticBackgroundJob>
+    ) =
     inherit BackgroundService ()
 
     let state : obj = null
@@ -79,7 +93,7 @@ type HereticBackgroundJob
 
             use _ =
                 new Timer (
-                    (fun _ -> callbackFunction gatewayClient mongoDb logger),
+                    (fun _ -> callbackFunction gatewayClient discordChannelInfo mongoDb logger),
                     state,
                     dueTime,
                     period
