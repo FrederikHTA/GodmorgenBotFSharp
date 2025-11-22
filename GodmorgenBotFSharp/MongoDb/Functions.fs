@@ -118,7 +118,7 @@ let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
         let collection = mongoDatabase.GetCollection<WordCount> $"word_count_{user.Id}"
 
         let! results =
-            collection.Find(fun _ -> true).SortByDescending(fun x -> x.Count).Limit(5).ToListAsync ()
+            collection.Find(fun _ -> true).SortByDescending(_.Count).Limit(5).ToListAsync ()
             |> Task.map Option.ofNull
 
         return results |> Option.map Seq.toArray
