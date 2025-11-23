@@ -75,7 +75,7 @@ let giveUserPointWithWordsCommand (ctx : Context) =
                     let! updateWordCountR = ctx.MongoDataBase |> MongoDb.Functions.updateWordCount user gWord mWord
 
                     match updateWordCountR with
-                    | Ok resultValue ->
+                    | Ok _ ->
                         return $"User <@{user.Id}> has been given a point from {giveUserPointResult.Previous} to {giveUserPointResult.Current} points!, "
                         + $"and added words: G-word: {gWord}, M-word: {mWord}"
                     | Error errorValue ->
