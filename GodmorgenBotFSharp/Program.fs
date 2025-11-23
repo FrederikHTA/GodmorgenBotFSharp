@@ -41,8 +41,7 @@ let builder =
         .ConfigureAppConfiguration(fun _ config ->
             config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true) |> ignore
         )
-        .ConfigureServices
-        configureServices
+        .ConfigureServices (configureServices)
 
 let host = builder.Build ()
 let gatewayClient = host.Services.GetRequiredService<GatewayClient> ()
