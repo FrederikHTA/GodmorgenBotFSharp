@@ -68,12 +68,19 @@ let wordCountCommand (ctx : Context) =
         }
     )
 
-type GiveUserPointWithWordsDelegate = delegate of commandContext : ApplicationCommandContext * user : NetCord.User * gWord : string * mWord : string -> Task<string>
+type GiveUserPointWithWordsDelegate =
+    delegate of
+        commandContext : ApplicationCommandContext * user : NetCord.User * gWord : string * mWord : string ->
+            Task<string>
 
 let giveUserPointWithWordsCommand (ctx : Context) =
     GiveUserPointWithWordsDelegate (fun commandContext user gWord mWord ->
         task {
-            ctx.Logger.LogInformation ("Got giveuserpointwithwords command request for {User}", user.Username)
+            ctx.Logger.LogInformation (
+                "Got giveuserpointwithwords command request for {User} requested by {Caller}",
+                user.Username,
+                commandContext.User.Username
+            )
 
             try
                 if commandContext.User.Id <> Constants.PuffyDiscordUserId then
@@ -106,7 +113,11 @@ type GiveUserPointDelegate = delegate of commandContext : ApplicationCommandCont
 let giveUserPointCommand (ctx : Context) =
     GiveUserPointDelegate (fun commandContext user ->
         task {
-            ctx.Logger.LogInformation ("Got giveuserpoint command request for {User}", user.Username)
+            ctx.Logger.LogInformation (
+                "Got giveuserpoint command request for {User} requested by {Caller}",
+                user.Username,
+                commandContext.User.Username
+            )
 
             try
                 if commandContext.User.Id <> Constants.PuffyDiscordUserId then
@@ -118,6 +129,31 @@ let giveUserPointCommand (ctx : Context) =
                         $"User <@{user.Id}> has been given a point from {result.Previous} to {result.Current} points!"
             with ex ->
                 ctx.Logger.LogError (ex, "Error in GiveUserPoint for user {User}. ", user.Username)
+                return "An error occurred while processing your request."
+        }
+    )
+
+type RemovePointDelegate = delegate of commandContext : ApplicationCommandContext * NetCord.User -> Task<string>
+
+let removePointCommand (ctx : Context) =
+    RemovePointDelegate (fun commandContext user ->
+        task {
+            ctx.Logger.LogInformation (
+                "Got RemovePoint command command request for {User} requested by {Caller}",
+                user.Username,
+                commandContext.User.Username
+            )
+
+            try
+                if commandContext.User.Id <> Constants.PuffyDiscordUserId then
+                    return "You are not allowed to use this command, Heretic!"
+                else
+                    let! result = ctx.MongoDataBase |> MongoDb.Functions.removeUserPoint user
+
+                    return
+                        $"User <@{user.Id}> has had a point removed from {result.Previous} to {result.Current} points!"
+            with ex ->
+                ctx.Logger.LogError (ex, "Error in RemovePoint for user {User}. ", user.Username)
                 return "An error occurred while processing your request."
         }
     )
