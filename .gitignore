@@ -23,6 +23,7 @@ bld/
 [Ll]og/
 [Ll]ogs/
 idea/
+*.xml
 
 # .NET Core
 project.lock.json
