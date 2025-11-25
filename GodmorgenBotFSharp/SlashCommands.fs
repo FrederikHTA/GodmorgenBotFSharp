@@ -39,7 +39,12 @@ let leaderboardCommand (ctx : Context) =
         }
     )
 
-type WordCountDelegate = delegate of NetCord.User * gWord : string * mWord : string -> Task<string>
+type WordCountDelegate =
+    delegate of
+        NetCord.User * //
+        gWord : string *
+        mWord : string ->
+            Task<string>
 
 let wordCountCommand (ctx : Context) =
     WordCountDelegate (fun user gWord mWord ->
@@ -70,7 +75,10 @@ let wordCountCommand (ctx : Context) =
 
 type GiveUserPointWithWordsDelegate =
     delegate of
-        commandContext : ApplicationCommandContext * user : NetCord.User * gWord : string * mWord : string ->
+        commandContext : ApplicationCommandContext * //
+        user : NetCord.User *
+        gWord : string *
+        mWord : string ->
             Task<string>
 
 let giveUserPointWithWordsCommand (ctx : Context) =
