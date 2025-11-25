@@ -10,7 +10,7 @@ let isWeekend (utcNow : DateTime) =
 
 let isWithinGodmorgenHours (utcNow : DateTime) =
     let rstNow = TimeZoneInfo.ConvertTimeFromUtc (utcNow, rst)
-    rstNow.Hour >= 6 && rstNow.Hour < 18
+    rstNow.Hour >= 6 && rstNow.Hour < 9
 
 let isValidGodmorgenMessage (message : string) =
     let trimmedMessage = message.Trim().ToLowerInvariant().Split ' '
