@@ -100,4 +100,11 @@ host.AddSlashCommand (
 )
 |> ignore
 
+host.AddSlashCommand (
+    "removepointfromuser",
+    "This command removes a point from a user, if Træmand deems it necessary.",
+    SlashCommands.removePointCommand ctx
+)
+|> ignore
+
 host.RunAsync () |> Async.AwaitTask |> Async.RunSynchronously

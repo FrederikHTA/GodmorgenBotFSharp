@@ -25,6 +25,33 @@ let getGodmorgenStats (filter : FilterDefinition<GodmorgenStats>) (mongoDatabase
         return results |> Option.map Seq.toArray
     }
 
+let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
+    task {
+        let collection = mongoDatabase.GetCollection<GodmorgenStats> godmorgenStatsCollectionName
+        let mongoId = GodmorgenStats.createMongoId user.Id DateTime.Today
+        let! mongoUserO = collection.Find(fun x -> x.Id = mongoId).FirstOrDefaultAsync () |> Task.map Option.ofNull
+
+        match mongoUserO with
+        | None ->
+            return {|
+                Previous = 0
+                Current = 0
+            |}
+        | Some value ->
+            let updatedUser =
+                { value with
+                    GodmorgenCount = Math.Max(0, value.GodmorgenCount - 1)
+                    GodmorgenStreak = Math.Max(0, value.GodmorgenStreak - 1)
+                }
+
+            let! _ = collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedUser)
+
+            return {|
+                Previous = value.GodmorgenCount
+                Current = updatedUser.GodmorgenCount
+            |}
+    }
+
 let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
     task {
         let collection = mongoDatabase.GetCollection<GodmorgenStats> godmorgenStatsCollectionName

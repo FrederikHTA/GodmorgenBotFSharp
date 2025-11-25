@@ -27,8 +27,8 @@ let getOverallRankings (godmorgenStats : GodmorgenStats array) : string =
     let userWinCount =
         godmorgenStats
         |> Array.groupBy (fun stat -> stat.Year, stat.Month)
-        |> Array.collect (fun ((year, month), group) ->
-            let maxCount = group |> Array.map (fun x -> x.GodmorgenCount) |> Array.max
+        |> Array.collect (fun (_, group) ->
+            let maxCount = group |> Array.map _.GodmorgenCount |> Array.max
             group |> Array.map (fun stat -> stat.DiscordUserId, (if stat.GodmorgenCount = maxCount then 1 else 0))
         )
         |> Array.groupBy fst
@@ -86,7 +86,7 @@ let getCurrentMonthLeaderboard (godmorgenStats : GodmorgenStats array) : string 
         "No one has said godmorgen yet."
     else
         godmorgenStats
-        |> Array.groupBy (fun x -> x.GodmorgenCount)
+        |> Array.groupBy _.GodmorgenCount
         |> Array.sortByDescending fst
         |> Array.mapi (fun i (count, group) ->
             if group.Length = 1 then
