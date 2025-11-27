@@ -2,12 +2,13 @@ module GodmorgenBotFSharp.MessageHandler
 
 open System
 open System.Threading.Tasks
+open GodmorgenBotFSharp.MongoDb.Types
 open GodmorgenBotFSharp.MongoDb.Types.GodmorgenStats
 open MongoDB.Driver
 open NetCord.Gateway
 open FsToolkit.ErrorHandling
 
-let buildFilter date authorId=
+let buildFilter (date : DateTime) (authorId : uint64) : FilterDefinition<GodmorgenStats> =
     Builders<MongoDb.Types.GodmorgenStats>.Filter
         .And (
             Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
