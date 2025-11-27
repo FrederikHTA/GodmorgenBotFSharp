@@ -7,6 +7,14 @@ open MongoDB.Driver
 open NetCord.Gateway
 open FsToolkit.ErrorHandling
 
+let buildFilter date authorId=
+    Builders<MongoDb.Types.GodmorgenStats>.Filter
+        .And (
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Month, date.Month),
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, authorId)
+        )
+
 let messageCreate (ctx : Context) (message : Message) : ValueTask =
     task {
         let isValidGodmorgenMessage = Validation.isValidGodmorgenMessage message.Content
@@ -21,12 +29,11 @@ let messageCreate (ctx : Context) (message : Message) : ValueTask =
             let words = message.Content.Trim().ToLowerInvariant().Split ' '
 
             match words with
-            | [| gWord ; mWord |] ->
-                let userFilter =
-                    Builders<MongoDb.Types.GodmorgenStats>.Filter
-                        .Eq (_.DiscordUserId, message.Author.Id)
+            | [| gWord ; mWord |] when gWord.Length >= 3 && mWord.Length >= 3 ->
+                let dateNow = DateTime.UtcNow
 
-                let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats userFilter
+                let filter = buildFilter dateNow message.Author.Id
+                let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
 
                 match godmorgenStatsO |> Option.bind Array.tryHead with
                 | None -> return ()
