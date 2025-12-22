@@ -15,7 +15,7 @@ let leaderboardCommand (ctx : Context) =
     LeaderboardDelegate (fun _ ->
         task {
             try
-                ctx.Logger.LogInformation ("Got leaderboard command request")
+                ctx.Logger.LogInformation "Got leaderboard command request"
                 let today = DateTime.UtcNow.Date
                 let targetMonth = today.Month
                 let targetYear = today.Year
@@ -57,8 +57,8 @@ let wordCountCommand (ctx : Context) =
                 return
                     match wordCountsR with
                     | Ok wordCounts ->
-                        $"The user <@{user.Id}> has used the word {gWord} {wordCounts.gWordCount} times "
-                        + $"and the word {mWord} {wordCounts.mWordCount} times."
+                        $"The user <@{user.Id}> has used the word {gWord} {wordCounts.GWord.Count} times "
+                        + $"and the word {mWord} {wordCounts.MWord.Count} times."
                     | Error errorValue ->
                         ctx.Logger.LogError (
                             "Failed to get word count for user {User} with error: {Error}",

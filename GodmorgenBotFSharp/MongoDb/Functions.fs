@@ -38,11 +38,11 @@ let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
                 Current = 0
             |}
         | Some value ->
-            let updatedUser =
-                { value with
-                    GodmorgenCount = Math.Max(0, value.GodmorgenCount - 1)
-                    GodmorgenStreak = Math.Max(0, value.GodmorgenStreak - 1)
-                }
+            let updatedUser = {
+                value with
+                    GodmorgenCount = Math.Max (0, value.GodmorgenCount - 1)
+                    GodmorgenStreak = Math.Max (0, value.GodmorgenStreak - 1)
+            }
 
             let! _ = collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedUser)
 
@@ -79,8 +79,8 @@ let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
 
 let updateWordCount (user : NetCord.User) (gWord : string) (mWord : string) (mongoDatabase : IMongoDatabase) =
     taskResult {
-        let gWordLower = gWord.ToLowerInvariant()
-        let mWordLower = mWord.ToLowerInvariant()
+        let gWordLower = gWord.ToLowerInvariant ()
+        let mWordLower = mWord.ToLowerInvariant ()
 
         do! Validation.validateWord gWordLower 'g'
         do! Validation.validateWord mWordLower 'm'
@@ -106,12 +106,12 @@ let getHereticUserIds (mongoDatabase : IMongoDatabase) =
         let currentMonth = today.Month
         let currentYear = today.Year
 
-        let! messagesO =
+        let! godmorgenStatsO =
             collection.Find(fun msg -> msg.Month = currentMonth && msg.Year = currentYear).ToListAsync ()
             |> Task.map Option.ofNull
 
         return
-            messagesO
+            godmorgenStatsO
             |> Option.map (fun messages ->
                 messages
                 |> Seq.filter (fun x -> x.LastGoodmorgenDate.Date < today)
@@ -119,18 +119,19 @@ let getHereticUserIds (mongoDatabase : IMongoDatabase) =
                 |> Seq.distinct
                 |> Array.ofSeq
             )
+            |> Option.defaultValue Array.empty
     }
 
 let getWordCount (user : NetCord.User) (gWord : string) (mWord : string) (mongoDatabase : IMongoDatabase) =
     taskResult {
-        let gWordLower = gWord.ToLowerInvariant()
-        let mWordLower = mWord.ToLowerInvariant()
+        let gWordLower = gWord.ToLowerInvariant ()
+        let mWordLower = mWord.ToLowerInvariant ()
 
         do! Validation.validateWord gWordLower 'g'
         do! Validation.validateWord mWordLower 'm'
 
         let collection = mongoDatabase.GetCollection<WordCount> $"word_count_{user.Id}"
-        let filter = Builders<WordCount>.Filter.In (_.Word, [| gWordLower; mWordLower |])
+        let filter = Builders<WordCount>.Filter.In (_.Word, [| gWordLower ; mWordLower |])
 
         let! wordCounts = collection.Find(filter).ToListAsync () |> Task.map Option.ofNull
 
@@ -138,13 +139,19 @@ let getWordCount (user : NetCord.User) (gWord : string) (mWord : string) (mongoD
             wordCounts
             |> Option.map Seq.toArray
             |> Option.defaultValue Array.empty
-            |> Array.map (fun x -> x.Word.ToLowerInvariant(), x.Count)
+            |> Array.map (fun x -> x.Word.ToLowerInvariant (), x.Count)
             |> Map.ofArray
 
-        return {|
-            gWordCount = counts |> Map.tryFind gWordLower |> Option.defaultValue 0
-            mWordCount = counts |> Map.tryFind mWordLower |> Option.defaultValue 0
-        |}
+        let findOrDefault (word : string) (wordLower : string) =
+            counts
+            |> Map.tryFind wordLower
+            |> Option.map (fun count -> { Word = word ; Count = count })
+            |> Option.defaultValue (WordCount.empty wordLower)
+
+        return {
+            GWord = findOrDefault gWord gWordLower
+            MWord = findOrDefault mWord mWordLower
+        }
     }
 
 let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) =

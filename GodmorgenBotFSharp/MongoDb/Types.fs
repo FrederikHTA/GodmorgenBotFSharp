@@ -49,3 +49,15 @@ type WordCount = {
     Count : int
 }
 
+module WordCount =
+    let empty word : WordCount =
+        {
+            Word = word
+            Count = 0
+        }
+
+type GodmorgenWordCounts = {
+    GWord : WordCount
+    MWord : WordCount
+}
+

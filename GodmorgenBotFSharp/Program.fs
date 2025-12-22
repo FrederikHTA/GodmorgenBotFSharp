@@ -61,7 +61,7 @@ let mongoConnectionString = configuration.GetConnectionString "MongoDb"
 
 let ctx = createContext configuration loggerFactory
 
-gatewayClient.add_MessageCreate (MessageHandler.messageCreate ctx)
+gatewayClient.add_MessageCreate (MessageHandler.onDiscordMessage ctx)
 
 host.AddSlashCommand (
     "leaderboard",

@@ -2,13 +2,11 @@ module GodmorgenBotFSharp.MessageHandler
 
 open System
 open System.Threading.Tasks
-open GodmorgenBotFSharp.MongoDb.Types
-open GodmorgenBotFSharp.MongoDb.Types.GodmorgenStats
 open MongoDB.Driver
 open NetCord.Gateway
 open FsToolkit.ErrorHandling
 
-let buildFilter (date : DateTime) (authorId : uint64) : FilterDefinition<GodmorgenStats> =
+let buildFilter (date : DateTime) (authorId : uint64) : FilterDefinition<MongoDb.Types.GodmorgenStats> =
     Builders<MongoDb.Types.GodmorgenStats>.Filter
         .And (
             Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
@@ -16,39 +14,46 @@ let buildFilter (date : DateTime) (authorId : uint64) : FilterDefinition<Godmorg
             Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, authorId)
         )
 
-let messageCreate (ctx : Context) (message : Message) : ValueTask =
+let private shouldIgnoreMessage (message : Message) =
+    let now = DateTime.UtcNow
+    message.Author.IsBot
+    || Validation.isWeekend now
+    || not (Validation.isValidGodmorgenMessage message.Content)
+    || not (Validation.isWithinGodmorgenHours now)
+
+let private tryParseGodmorgenWords (content : string) =
+    match content.Trim().ToLowerInvariant().Split ' ' with
+    | [| gWord ; mWord |] when gWord.Length >= 3 && mWord.Length >= 3 -> Some (gWord, mWord)
+    | _ -> None
+
+let private buildGreeting (authorId : uint64) =
+    if authorId = Constants.ConlonDiscordUserId then
+        $"Godmorgen <@{authorId}>, you little bitch! :blush:"
+    else
+        $"Godmorgen <@{authorId}>! :sun_with_face:"
+
+let private processGodmorgen (ctx : Context) (message : Message) (gWord : string) (mWord : string) =
     task {
-        let isValidGodmorgenMessage = Validation.isValidGodmorgenMessage message.Content
-        let isWeekend = Validation.isWeekend DateTime.UtcNow
-        let isWithinGodmorgenHours = Validation.isWithinGodmorgenHours DateTime.UtcNow
+        let dateNow = DateTime.UtcNow
+        let filter = buildFilter dateNow message.Author.Id
+        let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
 
-        if message.Author.IsBot || isWeekend then
-            ()
-        else if not isValidGodmorgenMessage || not isWithinGodmorgenHours then
-            ()
+        match godmorgenStatsO |> Option.bind Array.tryHead with
+        | None -> ()
+        | Some godmorgenStats when godmorgenStats |> MongoDb.Types.GodmorgenStats.hasWrittenGodmorgenToday -> ()
+        | Some _ ->
+            let! _ = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint message.Author
+            let! _ = ctx.MongoDataBase |> MongoDb.Functions.updateWordCount message.Author gWord mWord
+            message.ReplyAsync (buildGreeting message.Author.Id) |> ignore
+    }
+
+let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
+    task {
+        if shouldIgnoreMessage message then
+            return ()
         else
-            let words = message.Content.Trim().ToLowerInvariant().Split ' '
-
-            match words with
-            | [| gWord ; mWord |] when gWord.Length >= 3 && mWord.Length >= 3 ->
-                let dateNow = DateTime.UtcNow
-
-                let filter = buildFilter dateNow message.Author.Id
-                let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
-
-                match godmorgenStatsO |> Option.bind Array.tryHead with
-                | None -> return ()
-                | Some godmorgenStats ->
-                    if godmorgenStats |> MongoDb.Types.GodmorgenStats.hasWrittenGodmorgenToday then
-                        return ()
-                    else
-                        let! _ = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint message.Author
-                        let! _ = ctx.MongoDataBase |> MongoDb.Functions.updateWordCount message.Author gWord mWord
-
-                        if message.Author.Id = Constants.ConlonDiscordUserId then
-                            message.ReplyAsync $"Godmorgen <@{message.Author.Id}>, you little bitch! :blush:" |> ignore
-                        else
-                            message.ReplyAsync $"Godmorgen <@{message.Author.Id}>! :sun_with_face:" |> ignore
-            | _ -> ()
+            match tryParseGodmorgenWords message.Content with
+            | Some (gWord, mWord) -> do! processGodmorgen ctx message gWord mWord
+            | None -> ()
     }
     |> ValueTask
