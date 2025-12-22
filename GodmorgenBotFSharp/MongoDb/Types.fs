@@ -55,9 +55,3 @@ module WordCount =
             Word = word
             Count = 0
         }
-
-type GodmorgenWordCounts = {
-    GWord : WordCount
-    MWord : WordCount
-}
-

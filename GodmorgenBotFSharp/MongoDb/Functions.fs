@@ -148,10 +148,10 @@ let getWordCount (user : NetCord.User) (gWord : string) (mWord : string) (mongoD
             |> Option.map (fun count -> { Word = word ; Count = count })
             |> Option.defaultValue (WordCount.empty wordLower)
 
-        return {
+        return {|
             GWord = findOrDefault gWord gWordLower
             MWord = findOrDefault mWord mWordLower
-        }
+        |}
     }
 
 let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) =
