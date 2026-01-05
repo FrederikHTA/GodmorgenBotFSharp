@@ -2,6 +2,8 @@ module GodmorgenBotFSharp.MessageHandler
 
 open System
 open System.Threading.Tasks
+open DnsClient.Internal
+open Microsoft.Extensions.Logging
 open MongoDB.Driver
 open NetCord.Gateway
 open FsToolkit.ErrorHandling
@@ -16,6 +18,7 @@ let buildFilter (date : DateTime) (authorId : uint64) : FilterDefinition<MongoDb
 
 let private shouldIgnoreMessage (message : Message) =
     let now = DateTime.UtcNow
+
     message.Author.IsBot
     || Validation.isWeekend now
     || not (Validation.isValidGodmorgenMessage message.Content)
@@ -38,10 +41,13 @@ let private processGodmorgen (ctx : Context) (message : Message) (gWord : string
         let filter = buildFilter dateNow message.Author.Id
         let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
 
-        match godmorgenStatsO |> Option.bind Array.tryHead with
-        | None -> ()
-        | Some godmorgenStats when godmorgenStats |> MongoDb.Types.GodmorgenStats.hasWrittenGodmorgenToday -> ()
-        | Some _ ->
+        let hasAlreadyWrittenToday =
+            godmorgenStatsO
+            |> Option.bind Array.tryHead
+            |> Option.map MongoDb.Types.GodmorgenStats.hasWrittenGodmorgenToday
+            |> Option.defaultValue false
+
+        if not hasAlreadyWrittenToday then
             let! _ = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint message.Author
             let! _ = ctx.MongoDataBase |> MongoDb.Functions.updateWordCount message.Author gWord mWord
             message.ReplyAsync (buildGreeting message.Author.Id) |> ignore
@@ -52,8 +58,20 @@ let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
         if shouldIgnoreMessage message then
             return ()
         else
+            ctx.Logger.LogInformation (
+                "Processing godmorgen message: '{Message}' from {User}",
+                message.Content,
+                message.Author.Username
+            )
+
             match tryParseGodmorgenWords message.Content with
             | Some (gWord, mWord) -> do! processGodmorgen ctx message gWord mWord
-            | None -> ()
+            | None ->
+                ctx.Logger.LogError (
+                    "Failed to parse godmorgen words from message: '{Message}' from {User}",
+                    message.Content,
+                    message.Author.Username
+                )
+                ()
     }
     |> ValueTask
