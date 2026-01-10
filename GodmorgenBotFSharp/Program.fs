@@ -16,7 +16,6 @@ let createContext (config : IConfiguration) (loggerFactory : ILoggerFactory) =
         Logger = loggerFactory.CreateLogger "GodmorgenBot"
         DiscordChannelInfo = {
             ChannelId = config.GetValue<uint64> "ChannelId"
-            GuildId = config.GetValue<uint64> "GuildId"
         }
     }
 

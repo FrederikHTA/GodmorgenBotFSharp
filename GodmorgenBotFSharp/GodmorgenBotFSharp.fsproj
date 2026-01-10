@@ -25,6 +25,7 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
         <Content Include="Dockerfile" />
+        <Content Include="README.md" />
     </ItemGroup>
 
     <ItemGroup>

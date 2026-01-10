@@ -5,7 +5,6 @@ open MongoDB.Driver
 
 type DiscordChannelInfo = {
     ChannelId : uint64
-    GuildId : uint64
 }
 
 type Context = {
