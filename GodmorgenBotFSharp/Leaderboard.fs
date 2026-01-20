@@ -1,7 +1,8 @@
 module GodmorgenBotFSharp.Leaderboard
 
 open System
-open GodmorgenBotFSharp.MongoDb.Types
+open System.Globalization
+open GodmorgenBotFSharp.Domain
 
 type MonthYear = {
     Month : int
@@ -10,7 +11,7 @@ type MonthYear = {
 
 type MonthlyRank = {
     MonthYear : MonthYear
-    Rankings : string array
+    Rankings : Array<string>
 }
 
 let private getTrophyEmoji (rank : int) : string =
@@ -21,15 +22,19 @@ let private getTrophyEmoji (rank : int) : string =
     | _ -> ":poop:"
 
 let abbreviatedMonthName (month : int) : string =
-    Globalization.DateTimeFormatInfo.CurrentInfo.GetAbbreviatedMonthName (month)
+    DateTimeFormatInfo.CurrentInfo.GetAbbreviatedMonthName month
 
-let getOverallRankings (godmorgenStats : GodmorgenStats array) : string =
+let getOverallRankings (godmorgenStats : Array<GodmorgenStats>) : string =
     let userWinCount =
         godmorgenStats
-        |> Array.groupBy (fun stat -> stat.Year, stat.Month)
+        |> Array.groupBy (fun stat -> stat.LastGodmorgenDate.Year, stat.LastGodmorgenDate.Month)
         |> Array.collect (fun (_, group) ->
-            let maxCount = group |> Array.map _.GodmorgenCount |> Array.max
-            group |> Array.map (fun stat -> stat.DiscordUserId, (if stat.GodmorgenCount = maxCount then 1 else 0))
+            let maxCount = group |> Array.map (fun s -> GodmorgenCount.value s.Count) |> Array.max
+
+            group
+            |> Array.map (fun stat ->
+                stat.UserId, (if GodmorgenCount.value stat.Count = maxCount then 1 else 0)
+            )
         )
         |> Array.groupBy fst
         |> Array.map (fun (userId, wins) -> userId, wins |> Array.sumBy snd)
@@ -40,34 +45,38 @@ let getOverallRankings (godmorgenStats : GodmorgenStats array) : string =
         |> Array.groupBy snd
         |> Array.mapi (fun i (winCount, group) ->
             let rank = i + 1
-            let userMentions = group |> Array.map (fun (userId, _) -> $"<@%d{userId}>")
+
+            let userMentions =
+                group |> Array.map (fun (userId, _) -> $"<@%d{DiscordUserId.value userId}>")
 
             if group.Length = 1 then
-                $"The overall no: {getTrophyEmoji rank} {rank} is {userMentions[0]} with {winCount} month(s) won."
+                $"The overall no: {getTrophyEmoji rank} {rank} is {userMentions.[0]} with {winCount} month(s) won."
             else
                 let concatenatedMentions = String.concat ", " userMentions
                 $"The overall no: {getTrophyEmoji rank} {rank} is shared between {concatenatedMentions} with {winCount} month(s) won."
         )
 
-    String.concat "\n" overallRanking
+    String.concat Environment.NewLine overallRanking
 
-let getMonthlyLeaderboard (godmorgenStats : GodmorgenStats array) : MonthlyRank array =
+let getMonthlyLeaderboards (godmorgenStats : Array<GodmorgenStats>) : Array<MonthlyRank> =
     godmorgenStats
-    |> Array.groupBy (fun stat -> stat.Year, stat.Month)
+    |> Array.groupBy (fun stat -> stat.LastGodmorgenDate.Year, stat.LastGodmorgenDate.Month)
     |> Array.sortByDescending (fun ((year, month), _) -> year, month)
     |> Array.map (fun ((year, month), monthStats) ->
         let monthRanking =
             monthStats
-            |> Array.groupBy (fun s -> s.GodmorgenCount)
+            |> Array.groupBy (fun s -> GodmorgenCount.value s.Count)
             |> Array.sortByDescending fst
             |> Array.mapi (fun i (count, scoreGroup) ->
                 let monthName = abbreviatedMonthName month
 
                 if scoreGroup.Length = 1 then
-                    $"The no: {i + 1} of {monthName} {year} was <@{scoreGroup[0].DiscordUserId}> with a godmorgen count of: {count}"
+                    $"The no: {i + 1} of {monthName} {year} was <@{DiscordUserId.value scoreGroup.[0].UserId}> with a godmorgen count of: {count}"
                 else
                     let userMentions =
-                        scoreGroup |> Array.map (fun y -> $"<@%d{y.DiscordUserId}>") |> String.concat " + "
+                        scoreGroup
+                        |> Array.map (fun y -> $"<@%d{DiscordUserId.value y.UserId}>")
+                        |> String.concat " + "
 
                     $"The no: {i + 1} of {monthName} {year} was shared between: {userMentions} with a godmorgen count of: {count}"
             )
@@ -86,14 +95,18 @@ let getCurrentMonthLeaderboard (godmorgenStats : GodmorgenStats array) : string 
         "No one has said godmorgen yet."
     else
         godmorgenStats
-        |> Array.groupBy _.GodmorgenCount
+        |> Array.groupBy (fun s -> GodmorgenCount.value s.Count)
         |> Array.sortByDescending fst
-        |> Array.mapi (fun i (count, group) ->
-            if group.Length = 1 then
-                let userMention = $"<@%d{group[0].DiscordUserId}>"
-                $"The current no: {i + 1} is {userMention} with a godmorgen count of: {count}"
+        |> Array.mapi (fun i (godmorgenCount, godmorgenStatsGrouped) ->
+            if godmorgenStatsGrouped.Length = 1 then
+                let userMention = $"<@%d{DiscordUserId.value godmorgenStatsGrouped[0].UserId}>"
+                $"The current no: {i + 1} is {userMention} with a godmorgen count of: {godmorgenCount}"
             else
-                let userMentions = group |> Array.map (fun y -> $"<@%d{y.DiscordUserId}>") |> String.concat "\n"
-                $"The current no: {i + 1} is shared between: \n{userMentions} with a godmorgen count of: {count}"
+                let userMentions =
+                    godmorgenStatsGrouped
+                    |> Array.map (fun y -> $"<@%d{DiscordUserId.value y.UserId}>")
+                    |> String.concat Environment.NewLine
+
+                $"The current no: {i + 1} is shared between: {Environment.NewLine}{userMentions} with a godmorgen count of: {godmorgenCount}"
         )
-        |> String.concat "\n"
+        |> String.concat Environment.NewLine

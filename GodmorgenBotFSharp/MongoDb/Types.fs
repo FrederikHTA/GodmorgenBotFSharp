@@ -3,12 +3,24 @@ module GodmorgenBotFSharp.MongoDb.Types
 open System
 open MongoDB.Bson.Serialization.Attributes
 
+type Error =
+    | NotFound
+    | InternalError
+    | DatabaseError
+
+module Error =
+    let toString error =
+        match error with
+        | NotFound -> $"Not found"
+        | InternalError -> $"Internal error"
+        | DatabaseError -> $"Internal error"
+
 type GodmorgenStats = {
     [<BsonId>]
     Id : string
     DiscordUserId : uint64
     DiscordUsername : string
-    LastGoodmorgenDate : System.DateTimeOffset
+    LastGoodmorgenDate : DateTimeOffset
     GodmorgenCount : int
     GodmorgenStreak : int
     Year : int
@@ -19,8 +31,8 @@ module GodmorgenStats =
     let createMongoId (userId : uint64) (date : DateTime) : string =
         $"{userId}_{date.Month}_{date.Year}"
 
-    let hasWrittenGodmorgenToday (stats : GodmorgenStats) : bool =
-        stats.LastGoodmorgenDate.Date = DateTime.UtcNow.Date
+    let hasWrittenGodmorgenToday (stats : GodmorgenBotFSharp.Domain.GodmorgenStats) : bool =
+        stats.LastGodmorgenDate.Date = DateTime.UtcNow.Date
 
     let increaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
         stats with
@@ -50,8 +62,12 @@ type WordCount = {
 }
 
 module WordCount =
-    let empty word : WordCount =
-        {
-            Word = word
-            Count = 0
-        }
+    let empty word : WordCount = {
+        Word = word
+        Count = 0
+    }
+
+    let create word count : WordCount = {
+        Word = word
+        Count = count
+    }

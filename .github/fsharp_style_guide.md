@@ -61,7 +61,10 @@ module CustomerName =
 **Rule**: Prefer computation expressions (`result {}`, `asyncResult {}`) over raw `Result.bind`/`map` chains for complex logic.
 
 ### 2.1 Async/Task Flows
-Prefer F# `Async` over .NET `Task`. Most I/O operations will be `Async<Result<'T, 'Error>>`. Use `asyncResult`.
+Prefer F# `Async` over .NET `Task`. Most I/O operations will be `Async<Result<'T, 'Error>>`. 
+Unless interacting with .NET libraries that use `Task`, then use Task as well, and use `Async.AwaitTask` to map to `Async`
+use `asyncResult` when necessary to simplify result handling and control flow. 
+If no results / errors can occur, use the `async` computation expression instead.
 
 **Pattern:**
 ```fsharp
@@ -87,12 +90,23 @@ let processTransaction (cmd: CreateTransactionCmd) : Async<Result<TransactionId,
 ### 2.2 Validation
 Use `validation {}` (from FsToolkit) or `Result` for pure validation logic.
 
+### 2.3 Nullable handling
+Use `Option.ofObj` to convert nullable values to `Option` type.
+
+**Pattern:**
+```fsharp
+let nullableValue = Some 42
+let optionValue = Option.ofObj nullableValue
+```
+This is very important when doing interop with .NET libraries that use nullable types, such as FirstOrDefault() methods from C#
+
 ---
 
 ## 3. Formatting & Syntax
 
 ### 3.1 Type Annotations
 **Rule**: Use generic syntax `List<'T>` and `Option<'T>`.
+**Rule**: Public functions should always have type annotations.
 **Forbid**: Postfix syntax `string list` or `int option`.
 
 **Bad:**

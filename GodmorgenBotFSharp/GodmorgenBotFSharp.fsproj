@@ -7,11 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="AutoOpen.fs" />
         <Compile Include="Constants.fs" />
+        <Compile Include="Domain.fs" />
         <Compile Include="Context.fs" />
         <Compile Include="Validation.fs" />
-        <Compile Include="MongoDb\Types.fs" />
-        <Compile Include="MongoDb\Functions.fs" />
+        <Compile Include="MongoDb/Types.fs" />
+        <Compile Include="MongoDb/Functions.fs" />
         <Compile Include="Leaderboard.fs" />
         <Compile Include="SlashCommands.fs" />
         <Compile Include="MessageHandler.fs" />

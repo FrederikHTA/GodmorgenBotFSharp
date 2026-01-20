@@ -9,8 +9,7 @@ open MongoDB.Driver
 open NetCord.Gateway
 open FsToolkit.ErrorHandling
 
-
-let calculateDelayUntilNextRun () =
+let private calculateDelayUntilNextRun () =
     let utcNow = DateTime.UtcNow
     let rstNow = TimeZoneInfo.ConvertTimeFromUtc (utcNow, Validation.rst)
 
@@ -21,26 +20,38 @@ let calculateDelayUntilNextRun () =
 
     targetTimeUtc - utcNow
 
-let findAndDisgraceHeretics
+let private findAndDisgraceHeretics
     (gatewayClient : GatewayClient)
     (discordChannelInfo : DiscordChannelInfo)
     (mongoDb : IMongoDatabase)
     (logger : ILogger)
     =
-    task {
+    async {
         logger.LogInformation "Running heresy check"
         let! hereticUserIds = mongoDb |> MongoDb.Functions.getHereticUserIds
 
         if hereticUserIds.Length > 0 then
             let mentions =
-                hereticUserIds |> Array.map (fun discordUserId -> $"<@%d{discordUserId}>") |> String.concat ", "
+                hereticUserIds
+                |> Array.map (fun discordUserId ->
+                    $"<@%d{Domain.DiscordUserId.value discordUserId}>"
+                )
+                |> String.concat ", "
 
             let message = $"User(s) found guilty of heresy: %s{mentions}"
-            do! gatewayClient.Rest.SendMessageAsync (discordChannelInfo.ChannelId, message) |> Task.ignore
+
+            do!
+                gatewayClient.Rest.SendMessageAsync (discordChannelInfo.ChannelId, message)
+                |> Async.AwaitTask
+                |> Async.Ignore
         else
             let message = "No heretics found today. All hail the righteous!"
-            do! gatewayClient.Rest.SendMessageAsync (discordChannelInfo.ChannelId, message) |> Task.ignore
             logger.LogInformation "No heretics found."
+
+            do!
+                gatewayClient.Rest.SendMessageAsync (discordChannelInfo.ChannelId, message)
+                |> Async.AwaitTask
+                |> Async.Ignore
     }
 
 type HereticBackgroundJob
@@ -65,7 +76,9 @@ type HereticBackgroundJob
                 let dateTime = DateTime.UtcNow
 
                 if not (Validation.isWeekend dateTime) then
-                    do! findAndDisgraceHeretics gatewayClient discordChannelInfo mongoDb logger
+                    do!
+                        findAndDisgraceHeretics gatewayClient discordChannelInfo mongoDb logger
+                        |> Async.StartAsTask
                 else
                     logger.LogInformation "Skipping heresy check - it's the weekend"
 

@@ -14,13 +14,15 @@ let createContext (config : IConfiguration) (loggerFactory : ILoggerFactory) =
     {
         MongoDataBase = MongoDb.Functions.create mongoConnectionString
         Logger = loggerFactory.CreateLogger "GodmorgenBot"
-        DiscordChannelInfo = {
-            ChannelId = config.GetValue<uint64> "ChannelId"
-        }
+        DiscordChannelInfo = { ChannelId = config.GetValue<uint64> "ChannelId" }
     }
 
-let configureServices (hostBuilderContext : HostBuilderContext) (serviceCollection : IServiceCollection) =
+let configureServices
+    (hostBuilderContext : HostBuilderContext)
+    (serviceCollection : IServiceCollection)
+    =
     serviceCollection.AddLogging () |> ignore
+
     serviceCollection.AddDiscordGateway (fun options ->
         options.Intents <-
             GatewayIntents.GuildMessages
@@ -40,7 +42,12 @@ let configureServices (hostBuilderContext : HostBuilderContext) (serviceCollecti
         let ctx = createContext configuration loggerFactory
         let logger = loggerFactory.CreateLogger<BackgroundJob.HereticBackgroundJob> ()
 
-        new BackgroundJob.HereticBackgroundJob (gatewayClient, ctx.DiscordChannelInfo, ctx.MongoDataBase, logger)
+        new BackgroundJob.HereticBackgroundJob (
+            gatewayClient,
+            ctx.DiscordChannelInfo,
+            ctx.MongoDataBase,
+            logger
+        )
     )
     |> ignore
 
@@ -48,7 +55,8 @@ let builder =
     Host
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun _ config ->
-            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true) |> ignore
+            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true)
+            |> ignore
         )
         .ConfigureServices (configureServices)
 
@@ -87,9 +95,14 @@ host.AddSlashCommand (
     "giveuserpointwithwords",
     "This command gives a user a point, if Træmand deems they deserve it.",
     SlashCommands.giveUserPointWithWordsCommand ctx
-) |> ignore
+)
+|> ignore
 
-host.AddSlashCommand ("topwords", "This command shows top 5 words for a given user", SlashCommands.topWordsCommand ctx)
+host.AddSlashCommand (
+    "topwords",
+    "This command shows top 5 words for a given user",
+    SlashCommands.topWordsCommand ctx
+)
 |> ignore
 
 host.AddSlashCommand (
