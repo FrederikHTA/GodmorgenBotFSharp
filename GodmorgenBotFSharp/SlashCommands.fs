@@ -7,9 +7,7 @@ open GodmorgenBotFSharp.MongoDb.Types
 open MongoDB.Driver
 open Microsoft.Extensions.Logging
 open NetCord.Gateway
-open NetCord.Rest
 open NetCord.Services.ApplicationCommands
-open FsToolkit.ErrorHandling
 
 type LeaderboardDelegate = delegate of unit -> Task<string>
 

@@ -1,5 +1,4 @@
-﻿open System.Threading.Tasks
-open GodmorgenBotFSharp
+﻿open GodmorgenBotFSharp
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting

@@ -7,7 +7,6 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open MongoDB.Driver
 open NetCord.Gateway
-open FsToolkit.ErrorHandling
 
 let private calculateDelayUntilNextRun () =
     let utcNow = DateTime.UtcNow
