@@ -17,7 +17,7 @@ The bot supports the following slash commands:
 
 ## Technology Stack
 
-- **Language**: F# (.NET 9.0)
+- **Language**: F# (.NET 10.0)
 - **Discord Library**: NetCord
 - **Database**: MongoDB
 - **Containerization**: Docker
@@ -26,7 +26,7 @@ The bot supports the following slash commands:
 
 ### Prerequisites
 
-- .NET 9.0 SDK
+- .NET 10.0 SDK
 - MongoDB instance
 - Discord Bot Token
 
@@ -36,6 +36,5 @@ docker run -d \
   -e ConnectionStrings__MongoDb="your_mongo_connection_string" \
   -e DISCORD_TOKEN="your_discord_token" \
   -e ChannelId="your_channel_id" \
-  -e GuildId="your_guild_id" \
   godmorgenbot
 ```
