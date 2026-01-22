@@ -22,7 +22,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
-idea/
+.idea/
 *.xml
 
 # .NET Core
@@ -42,6 +42,7 @@ ScaffoldingReadMe.txt
 # Others
 ~$*
 *~
+*.DotSettings.user
 CodeCoverage/
 
 # MSBuild Binary and Structured Log
