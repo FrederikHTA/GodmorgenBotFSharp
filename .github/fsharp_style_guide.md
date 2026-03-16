@@ -1,6 +1,11 @@
-F# Style Guide for AI Agents
+---
+name: fsharp-coding-style
+description: The F# style guide. Always read this before writing any F# code.
+---
 
-This document defines the coding standards, patterns, and principles for the Aleta codebase.
+# F# Style Guide
+
+This document defines the coding standards, patterns, and principles for the codebase.
 **As an AI agent, you must strictly adhere to these guidelines when generating, refactoring, or reviewing code.**
 
 ## Core Principles
@@ -61,9 +66,9 @@ module CustomerName =
 **Rule**: Prefer computation expressions (`result {}`, `asyncResult {}`) over raw `Result.bind`/`map` chains for complex logic.
 
 ### 2.1 Async/Task Flows
-Prefer F# `Async` over .NET `Task`. Most I/O operations will be `Async<Result<'T, 'Error>>`. 
+Prefer F# `Async` over .NET `Task`. Most I/O operations will be `Async<Result<'T, 'Error>>`.
 Unless interacting with .NET libraries that use `Task`, then use Task as well, and use `Async.AwaitTask` to map to `Async`
-use `asyncResult` when necessary to simplify result handling and control flow. 
+use `asyncResult` when necessary to simplify result handling and control flow.
 If no results / errors can occur, use the `async` computation expression instead.
 
 **Pattern:**
@@ -106,17 +111,22 @@ This is very important when doing interop with .NET libraries that use nullable 
 
 ### 3.1 Type Annotations
 **Rule**: Use generic syntax `List<'T>` and `Option<'T>`.
+**Rule**: Use `Array<'T>` from `AutoOpen.fs`, not lowercase `array<'T>` or `'T[]`.
 **Rule**: Public functions should always have type annotations.
 **Forbid**: Postfix syntax `string list` or `int option`.
 
 **Bad:**
 ```fsharp
 let names: string list = []
+let items: string array = [||]
 ```
 
 **Good:**
 ```fsharp
+open AutoOpen.fs
+
 let names: List<string> = []
+let items: Array<string> = [||]
 ```
 
 ### 3.2 Pipelining
@@ -135,7 +145,22 @@ let x = normalize "some string"
 let x = "some string" |> normalize
 ```
 
-### 3.3 Naming Conventions
+### 3.3 Tuple Destructuring
+**Rule**: Avoid `fst` and `snd` — use explicit destructuring so readers can immediately see what is being extracted.
+
+**Bad:**
+```fsharp
+allocations
+|> Array.map snd
+```
+
+**Good:**
+```fsharp
+allocations
+|> Array.map (fun (_, allocation) -> allocation)
+```
+
+### 3.4 Naming Conventions
 - **Types/Modules/DUs/Records**: `PascalCase`
 - **Functions/Values/Parameters**: `camelCase`
 - **Interfaces**: `IInterfaceName`
@@ -183,12 +208,9 @@ let calculateInterest ...
 
 ---
 
-## 6. Checklist for AI Review
 
-Before outputting code, verify:
-- [ ] Did I use `asyncResult` for async flows?
-- [ ] Are all lists/options using `<'T>` syntax (e.g., `List<int>`)?
-- [ ] Did I eliminate backward pipes `<|`?
-- [ ] Are invalid states impossible (e.g., no raw strings for IDs where types exist)?
-- [ ] Are `unsafe_` prefixes used for unvalidated inputs?
-- [ ] Is `FsToolkit.ErrorHandling` used instead of exceptions?
+## 6. Other
+ - Always use `[<RequireQualifiedAccess>]` on discriminated union types.
+ - Always use `System.DateOnly` for dates. Add `open System` such that you can use just `DateOnly`.
+ - Use the helper `divc` for short form of `div [ Class "myCssClassName"] [ ... ]`, i.e `divc "myCssClassName" [ ... ]`
+ - If the type of a record value cannot be inferred correctly use the `{ ... } : MyRecordType` syntax to annotate the type (unless the value is defined by a `let` statement then use `let x : MyRecordType = { ... }`).
