@@ -28,11 +28,13 @@ type GodmorgenStats = {
 }
 
 module GodmorgenStats =
-    let createMongoId (userId : uint64) (date : DateTime) : string =
+    let createMongoId (userId : uint64) (date : DateOnly) : string =
         $"{userId}_{date.Month}_{date.Year}"
 
     let hasWrittenGodmorgenToday (stats : GodmorgenBotFSharp.Domain.GodmorgenStats) : bool =
-        stats.LastGodmorgenDate.Date = DateTime.UtcNow.Date
+        let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
+        let lastWrittenDateUtc = DateOnly.FromDateTime stats.LastGodmorgenDate.UtcDateTime
+        lastWrittenDateUtc = todayUtc
 
     let increaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
         stats with
@@ -42,13 +44,13 @@ module GodmorgenStats =
     }
 
     let create (userId : uint64) (userName : string) : GodmorgenStats =
-        let utcNow = DateTime.UtcNow
+        let utcNow = DateTimeOffset.UtcNow
 
         {
-            Id = createMongoId userId DateTime.Today
+            Id = createMongoId userId (DateOnly.FromDateTime utcNow.UtcDateTime)
             DiscordUserId = userId
             DiscordUsername = userName
-            LastGoodmorgenDate = DateTimeOffset.UtcNow
+            LastGoodmorgenDate = utcNow
             GodmorgenCount = 1
             GodmorgenStreak = 1
             Year = utcNow.Year

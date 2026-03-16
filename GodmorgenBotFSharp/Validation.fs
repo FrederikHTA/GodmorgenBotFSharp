@@ -5,12 +5,13 @@ open GodmorgenBotFSharp.Domain
 
 let rst = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
 
-let isWeekend (utcNow : DateTime) =
-    let day = utcNow.DayOfWeek
+let isWeekend (utcNow : DateTimeOffset) : bool =
+    let rstNow = TimeZoneInfo.ConvertTime (utcNow, rst)
+    let day = rstNow.DayOfWeek
     day = DayOfWeek.Saturday || day = DayOfWeek.Sunday
 
-let isWithinGodmorgenHours (utcNow : DateTime) =
-    let rstNow = TimeZoneInfo.ConvertTimeFromUtc (utcNow, rst)
+let isWithinGodmorgenHours (utcNow : DateTimeOffset) : bool =
+    let rstNow = TimeZoneInfo.ConvertTime (utcNow, rst)
     rstNow.Hour >= 6 && rstNow.Hour < 9
 
 let parseGodmorgenMessage (message : string) : Result<GodmorgenMessage, ValidationError> =

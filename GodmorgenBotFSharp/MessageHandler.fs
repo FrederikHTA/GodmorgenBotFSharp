@@ -20,12 +20,12 @@ let buildFilter
         )
 
 let private shouldIgnoreMessage (message : Message) =
-    let now = DateTime.UtcNow
+    let nowUtc = DateTimeOffset.UtcNow
 
     message.Author.IsBot
-    || Validation.isWeekend now
+    || Validation.isWeekend nowUtc
     || not (Validation.isValidGodmorgenMessage message.Content)
-    || not (Validation.isWithinGodmorgenHours now)
+    || not (Validation.isWithinGodmorgenHours nowUtc)
 
 let private buildGreeting (authorId : uint64) =
     if authorId = Constants.ConlonDiscordUserId then
@@ -39,8 +39,8 @@ let private processGodmorgenMessage
     (godmorgenMessage : GodmorgenMessage)
     =
     async {
-        let dateNow = DateTime.UtcNow
-        let filter = buildFilter dateNow message.Author.Id
+        let dateNowUtc = DateTimeOffset.UtcNow
+        let filter = buildFilter dateNowUtc.UtcDateTime message.Author.Id
 
         let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
 

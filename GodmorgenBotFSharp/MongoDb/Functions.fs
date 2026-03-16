@@ -60,7 +60,8 @@ let removeUserPoint
         let collection =
             mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let mongoId = Types.GodmorgenStats.createMongoId user.Id DateTime.Today
+        let mongoId =
+            Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
 
         let! mongoUserO =
             collection.Find(fun x -> x.Id = mongoId).FirstOrDefaultAsync ()
@@ -99,7 +100,8 @@ let giveUserPoint
         let collection =
             mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let mongoId = Types.GodmorgenStats.createMongoId user.Id DateTime.Today
+        let mongoId =
+            Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
 
         let! mongoUserO =
             collection.Find(fun x -> x.Id = mongoId).FirstOrDefaultAsync ()
@@ -162,9 +164,9 @@ let getHereticUserIds (mongoDatabase : IMongoDatabase) : Async<Array<Domain.Disc
         let collection =
             mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let today = DateTime.UtcNow.Date
-        let currentMonth = today.Month
-        let currentYear = today.Year
+        let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
+        let currentMonth = todayUtc.Month
+        let currentYear = todayUtc.Year
 
         let! godmorgenStatsO =
             collection
@@ -177,7 +179,7 @@ let getHereticUserIds (mongoDatabase : IMongoDatabase) : Async<Array<Domain.Disc
             godmorgenStatsO
             |> Option.map (fun messages ->
                 messages
-                |> Seq.filter (fun x -> x.LastGoodmorgenDate.Date < today)
+                |> Seq.filter (fun x -> DateOnly.FromDateTime x.LastGoodmorgenDate.UtcDateTime < todayUtc)
                 |> Seq.map (fun x -> x.DiscordUserId |> Domain.DiscordUserId.create)
                 |> Seq.distinct
                 |> Array.ofSeq
