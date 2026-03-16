@@ -41,5 +41,14 @@
       <PackageReference Include="NetCord.Hosting.Services" Version="1.0.0-alpha.448" />
       <PackageReference Include="NetCord.Services" Version="1.0.0-alpha.448" />
     </ItemGroup>
+    
+    <!-- Packages used for testing. Not included in releases. -->
+    <ItemGroup Condition="'$(Configuration)'=='Debug'">
+        <PackageReference Include="coverlet.collector" PrivateAssets="All" Version="8.0.0" />
+        <PackageReference Include="Expecto" PrivateAssets="All" Version="10.2.3" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" PrivateAssets="All" Version="18.3.0" />
+        <PackageReference Include="Testcontainers.MongoDb" PrivateAssets="All" Version="4.11.0" />
+        <PackageReference Include="YoloDev.Expecto.TestSdk" PrivateAssets="All" Version="0.15.5" />
+    </ItemGroup>
 
 </Project>
