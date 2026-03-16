@@ -3,15 +3,13 @@ module GodmorgenBotFSharp.Validation
 open System
 open GodmorgenBotFSharp.Domain
 
-let rst = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
-
 let isWeekend (utcNow : DateTimeOffset) : bool =
-    let rstNow = TimeZoneInfo.ConvertTime (utcNow, rst)
+    let rstNow = TimeZoneInfo.ConvertTime (utcNow, Constants.romanStandardTime)
     let day = rstNow.DayOfWeek
     day = DayOfWeek.Saturday || day = DayOfWeek.Sunday
 
 let isWithinGodmorgenHours (utcNow : DateTimeOffset) : bool =
-    let rstNow = TimeZoneInfo.ConvertTime (utcNow, rst)
+    let rstNow = TimeZoneInfo.ConvertTime (utcNow, Constants.romanStandardTime)
     rstNow.Hour >= 6 && rstNow.Hour < 9
 
 let parseGodmorgenMessage (message : string) : Result<GodmorgenMessage, ValidationError> =

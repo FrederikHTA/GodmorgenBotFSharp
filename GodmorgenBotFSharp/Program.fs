@@ -1,4 +1,5 @@
-﻿open GodmorgenBotFSharp
+﻿open System
+open GodmorgenBotFSharp
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
@@ -7,21 +8,35 @@ open NetCord.Gateway
 open NetCord.Hosting.Gateway
 open NetCord.Hosting.Services.ApplicationCommands
 
-let createContext (config : IConfiguration) (loggerFactory : ILoggerFactory) =
-    let mongoConnectionString = config.GetConnectionString "MongoDb"
+let getConnectionStringOrThrow (environmentVariableName : string)(config : IConfiguration) =
+    config.GetConnectionString environmentVariableName
+    |> Option.ofObj
+    |> Option.defaultValue (failwith $"'{environmentVariableName}' connection string is missing in configuration.")
+
+let createContextOrThrow (configuration : IConfiguration) (logger : ILogger) =
+    let mongoConnectionString = getConnectionStringOrThrow "MongoDb" configuration
+
+    let channelId =
+        configuration.GetValue<string> "ChannelId"
+        |> Option.ofObj
+        |> Option.bind (fun value ->
+            match UInt64.TryParse value with
+            | true, parsedValue -> Some parsedValue
+            | false, _ -> None
+        )
+        |> Option.defaultValue (
+            failwith
+                "Invalid 'ChannelId' value in configuration. Must be a valid unsigned 64-bit integer, saved as a string in the configuration."
+        )
 
     {
         MongoDataBase = MongoDb.Functions.create mongoConnectionString
-        Logger = loggerFactory.CreateLogger "GodmorgenBot"
-        DiscordChannelInfo = { ChannelId = config.GetValue<uint64> "ChannelId" }
+        Logger = logger
+        DiscordChannelInfo = { ChannelId = channelId }
     }
 
-let configureServices
-    (hostBuilderContext : HostBuilderContext)
-    (serviceCollection : IServiceCollection)
-    =
-    serviceCollection.AddLogging () |> ignore
 
+let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceCollection) =
     serviceCollection.AddDiscordGateway (fun options ->
         options.Intents <-
             GatewayIntents.GuildMessages
@@ -34,38 +49,34 @@ let configureServices
 
     serviceCollection.AddApplicationCommands () |> ignore
 
-    serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun x ->
-        let loggerFactory = x.GetRequiredService<ILoggerFactory> ()
-        let gatewayClient = x.GetRequiredService<GatewayClient> ()
-        let configuration = x.GetRequiredService<IConfiguration> ()
-        let ctx = createContext configuration loggerFactory
+    serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun serviceProvider ->
+        let loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory> ()
+        let gatewayClient = serviceProvider.GetRequiredService<GatewayClient> ()
+        let configuration = serviceProvider.GetRequiredService<IConfiguration> ()
         let logger = loggerFactory.CreateLogger<BackgroundJob.HereticBackgroundJob> ()
-
-        new BackgroundJob.HereticBackgroundJob (
-            gatewayClient,
-            ctx.DiscordChannelInfo,
-            ctx.MongoDataBase,
-            logger
-        )
+        let ctx = createContextOrThrow configuration logger
+        new BackgroundJob.HereticBackgroundJob (ctx, gatewayClient)
     )
     |> ignore
 
-let builder =
+let host =
     Host
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun _ config ->
             config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true)
             |> ignore
         )
-        .ConfigureServices (configureServices)
+        .ConfigureServices(configureServices)
+        .Build ()
 
-let host = builder.Build ()
 let gatewayClient = host.Services.GetRequiredService<GatewayClient> ()
 let loggerFactory = host.Services.GetRequiredService<ILoggerFactory> ()
 let configuration = host.Services.GetRequiredService<IConfiguration> ()
-let mongoConnectionString = configuration.GetConnectionString "MongoDb"
 
-let ctx = createContext configuration loggerFactory
+let mongoConnectionString = getConnectionStringOrThrow "MongoDb" configuration
+let logger = loggerFactory.CreateLogger "Program"
+
+let ctx = createContextOrThrow configuration logger
 
 gatewayClient.add_MessageCreate (MessageHandler.onDiscordMessage ctx)
 

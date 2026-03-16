@@ -8,12 +8,13 @@ open MongoDB.Driver
 open Microsoft.Extensions.Logging
 open NetCord.Gateway
 open NetCord.Services.ApplicationCommands
+open FsToolkit.ErrorHandling
 
 type LeaderboardDelegate = delegate of unit -> Task<string>
 
 let leaderboardCommand (ctx : Context) =
     LeaderboardDelegate (fun _ ->
-        async {
+        task {
             ctx.Logger.LogInformation "Got leaderboard command request"
             let today = DateTime.UtcNow.Date
             let targetMonth = today.Month
@@ -32,14 +33,13 @@ let leaderboardCommand (ctx : Context) =
             | Some stats -> return Leaderboard.getCurrentMonthLeaderboard stats
             | None -> return "No one has said godmorgen yet this month."
         }
-        |> Async.StartAsTask
     )
 
 type WordCountDelegate = delegate of NetCord.User * gWord : string * mWord : string -> Task<string>
 
 let wordCountCommand (ctx : Context) =
     WordCountDelegate (fun user gWordStr mWordStr ->
-        async {
+        task {
             ctx.Logger.LogInformation ("Got wordcount command request for {User}", user.Username)
 
             // Domain validation
@@ -56,7 +56,6 @@ let wordCountCommand (ctx : Context) =
             | Error e, _ -> return $"Invalid G-Word: {e}"
             | _, Error e -> return $"Invalid M-Word: {e}"
         }
-        |> Async.StartAsTask
     )
 
 type GiveUserPointWithWordsDelegate =
@@ -69,7 +68,7 @@ type GiveUserPointWithWordsDelegate =
 
 let giveUserPointWithWordsCommand (ctx : Context) =
     GiveUserPointWithWordsDelegate (fun commandContext user gWordStr mWordStr ->
-        async {
+        task {
             ctx.Logger.LogInformation (
                 "Got giveuserpointwithwords command request for {User} requested by {Caller}",
                 user.Username,
@@ -96,7 +95,6 @@ let giveUserPointWithWordsCommand (ctx : Context) =
                 | Error e, _ -> return $"Invalid G-Word: {e}"
                 | _, Error e -> return $"Invalid M-Word: {e}"
         }
-        |> Async.StartAsTask
     )
 
 type GiveUserPointDelegate =
@@ -104,7 +102,7 @@ type GiveUserPointDelegate =
 
 let giveUserPointCommand (ctx : Context) =
     GiveUserPointDelegate (fun commandContext user ->
-        async {
+        task {
             ctx.Logger.LogInformation (
                 "Got giveuserpoint command request for {User} requested by {Caller}",
                 user.Username,
@@ -120,7 +118,6 @@ let giveUserPointCommand (ctx : Context) =
                 return
                     $"User <@{user.Id}> has been given a point from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
         }
-        |> Async.StartAsTask
     )
 
 type RemovePointDelegate =
@@ -128,7 +125,7 @@ type RemovePointDelegate =
 
 let removePointCommand (ctx : Context) =
     RemovePointDelegate (fun commandContext user ->
-        async {
+        task {
             ctx.Logger.LogInformation (
                 "Got RemovePoint command command request for {User} requested by {Caller}",
                 user.Username,
@@ -144,14 +141,13 @@ let removePointCommand (ctx : Context) =
                 return
                     $"User <@{user.Id}> has had a point removed from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
         }
-        |> Async.StartAsTask
     )
 
 type TopWordsDelegate = delegate of NetCord.User -> Task<string>
 
 let topWordsCommand (ctx : Context) =
     TopWordsDelegate (fun user ->
-        async {
+        task {
             ctx.Logger.LogInformation ("Got topwords command request for {User}", user.Username)
 
             let! top5WordsO = MongoDb.Functions.getTop5Words user ctx.MongoDataBase
@@ -172,14 +168,13 @@ let topWordsCommand (ctx : Context) =
                 ctx.Logger.LogError "Failed to get top words"
                 return "Failed to get top words."
         }
-        |> Async.StartAsTask
     )
 
 type AllTimeLeaderboardDelegate = delegate of unit -> Task<string>
 
 let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
     AllTimeLeaderboardDelegate (fun _ ->
-        async {
+        task {
             ctx.Logger.LogInformation "Got alltimeleaderboard command request"
             let filter = Builders<GodmorgenStats>.Filter.Empty
 
@@ -209,10 +204,8 @@ let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
                             ctx.DiscordChannelInfo.ChannelId,
                             monthlyMessage
                         )
-                        |> Async.AwaitTask
-                        |> Async.Ignore
+                        |> Task.ignore
 
                 return $"Overall Ranking:{Environment.NewLine}{overallRankings}"
         }
-        |> Async.StartAsTask
     )

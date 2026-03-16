@@ -8,17 +8,6 @@ open NetCord.Gateway
 open FsToolkit.ErrorHandling
 open GodmorgenBotFSharp.Domain
 
-let buildFilter
-    (date : DateTime)
-    (authorId : uint64)
-    : FilterDefinition<MongoDb.Types.GodmorgenStats> =
-    Builders<MongoDb.Types.GodmorgenStats>.Filter
-        .And (
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Month, date.Month),
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, authorId)
-        )
-
 let private shouldIgnoreMessage (message : Message) =
     let nowUtc = DateTimeOffset.UtcNow
 
@@ -33,14 +22,25 @@ let private buildGreeting (authorId : uint64) =
     else
         $"Godmorgen <@{authorId}>! :sun_with_face:"
 
+let private buildAuthorFilter
+    (date : DateTime)
+    (authorId : uint64)
+    : FilterDefinition<MongoDb.Types.GodmorgenStats> =
+    Builders<MongoDb.Types.GodmorgenStats>.Filter
+        .And (
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Month, date.Month),
+            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, authorId)
+        )
+
 let private processGodmorgenMessage
     (ctx : Context)
     (message : Message)
     (godmorgenMessage : GodmorgenMessage)
     =
-    async {
+    task {
         let dateNowUtc = DateTimeOffset.UtcNow
-        let filter = buildFilter dateNowUtc.UtcDateTime message.Author.Id
+        let filter = buildAuthorFilter dateNowUtc.UtcDateTime message.Author.Id
 
         let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStats filter
 
@@ -62,12 +62,11 @@ let private processGodmorgenMessage
 
             do!
                 message.ReplyAsync (buildGreeting message.Author.Id)
-                |> Async.AwaitTask
-                |> Async.Ignore
+                |> Task.ignore
     }
 
 let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
-    async {
+    task {
         if shouldIgnoreMessage message then
             return ()
         else
@@ -81,12 +80,12 @@ let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
             | Ok godmorgenMessage -> do! processGodmorgenMessage ctx message godmorgenMessage
             | Error validationError ->
                 ctx.Logger.LogError (
-                    "Failed to parse godmorgen words from message: '{Message}' from {User}",
+                    "Failed to parse godmorgen words from message: '{Message}' from '{User}', error: '{Error}'",
                     message.Content,
-                    message.Author.Username
+                    message.Author.Username,
+                    validationError
                 )
 
                 ()
     }
-    |> Async.StartAsTask
     |> ValueTask

@@ -1,6 +1,7 @@
 module GodmorgenBotFSharp.MongoDb.Functions
 
 open System
+open System.Threading.Tasks
 open GodmorgenBotFSharp
 open MongoDB.Driver
 open FsToolkit.ErrorHandling
@@ -55,8 +56,8 @@ let getGodmorgenStats
 let removeUserPoint
     (user : NetCord.User)
     (mongoDatabase : IMongoDatabase)
-    : Async<PreviousAndCurrentGodmorgenCount> =
-    async {
+    : Task<PreviousAndCurrentGodmorgenCount> =
+    task {
         let collection =
             mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -65,8 +66,7 @@ let removeUserPoint
 
         let! mongoUserO =
             collection.Find(fun x -> x.Id = mongoId).FirstOrDefaultAsync ()
-            |> Async.AwaitTask
-            |> Async.map Option.ofObj
+            |> Task.map Option.ofObj
 
         match mongoUserO with
         | None ->
@@ -81,10 +81,7 @@ let removeUserPoint
                     GodmorgenStreak = Math.Max (0, value.GodmorgenStreak - 1)
             }
 
-            let! _ =
-                collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedUser)
-                |> Async.AwaitTask
-                |> Async.map Option.ofObj
+            do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedUser) |> Task.ignore
 
             return {
                 Previous = value.GodmorgenCount
@@ -95,8 +92,8 @@ let removeUserPoint
 let giveUserPoint
     (user : NetCord.User)
     (mongoDatabase : IMongoDatabase)
-    : Async<PreviousAndCurrentGodmorgenCount> =
-    async {
+    : Task<PreviousAndCurrentGodmorgenCount> =
+    task {
         let collection =
             mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -105,14 +102,13 @@ let giveUserPoint
 
         let! mongoUserO =
             collection.Find(fun x -> x.Id = mongoId).FirstOrDefaultAsync ()
-            |> Async.AwaitTask
-            |> Async.map Option.ofObj
+            |> Task.map Option.ofObj
 
         match mongoUserO with
         | None ->
             let newUser = Types.GodmorgenStats.create user.Id user.Username
 
-            do! collection.InsertOneAsync newUser |> Async.AwaitTask
+            do! collection.InsertOneAsync newUser
 
             return {
                 Previous = 0
@@ -123,8 +119,7 @@ let giveUserPoint
 
             let! _ =
                 collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedUser)
-                |> Async.AwaitTask
-                |> Async.map Option.ofObj
+                |> Task.map Option.ofObj
 
             return {
                 Previous = value.GodmorgenCount
@@ -137,11 +132,11 @@ let updateWordCount
     (gWord : Domain.GWord)
     (mWord : Domain.MWord)
     (mongoDatabase : IMongoDatabase)
-    : Async<unit> =
-    async {
+    : Task =
+    task {
         let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"
 
-        let upsertWord (word : string) : Async<Option<Types.WordCount>> =
+        let upsertWord (word : string) =
             let trimmedWord = word.Trim().ToLowerInvariant ()
             let filter = Builders<Types.WordCount>.Filter.Eq (_.Word, trimmedWord)
             let update = Builders<Types.WordCount>.Update.Inc (_.Count, 1)
@@ -149,12 +144,11 @@ let updateWordCount
             options.IsUpsert <- true
 
             collection.FindOneAndUpdateAsync (filter, update, options)
-            |> Async.AwaitTask
-            |> Async.map Option.ofObj
 
-        let! _ =
+        do!
             [ upsertWord (Domain.GWord.value gWord) ; upsertWord (Domain.MWord.value mWord) ]
-            |> Async.Parallel
+            |> Task.WhenAll
+            |> Task.ignore
 
         return ()
     }
