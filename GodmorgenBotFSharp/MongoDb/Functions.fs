@@ -242,18 +242,34 @@ let getTop5Words
 open Expecto
 open Testcontainers.MongoDb
 
+let private sharedMongoContainer =
+    lazy (
+        task {
+            let image : string = "mongo:7.0"
+            let container = MongoDbBuilder image
+            let mongoContainer = container.Build ()
+
+            do! mongoContainer.StartAsync ()
+
+            AppDomain.CurrentDomain.ProcessExit.Add(fun _ ->
+                mongoContainer.DisposeAsync().GetAwaiter().GetResult()
+            )
+
+            return mongoContainer
+        }
+    )
+
 let private withMongoDatabase (runTest : IMongoDatabase -> Task<unit>) : Task<unit> =
     task {
-        let image : string = "mongo:7.0"
-        let container = MongoDbBuilder image
-        let mongoContainer = container.Build ()
+        let! mongoContainer = sharedMongoContainer.Value
+        let databaseName : string = $"godmorgen_test_{Guid.NewGuid ():N}"
+        let mongoClient = new MongoClient (mongoContainer.GetConnectionString ())
+        let database = mongoClient.GetDatabase databaseName
 
         try
-            do! mongoContainer.StartAsync ()
-            let database = create (mongoContainer.GetConnectionString ())
             do! runTest database
         finally
-            mongoContainer.DisposeAsync().GetAwaiter().GetResult()
+            mongoClient.DropDatabase databaseName
     }
 
 let private seedGodmorgenStats
@@ -268,21 +284,18 @@ let private seedGodmorgenStats
 [<Tests>]
 let tests =
     testList "MongoDb.Functions tests" [
-        testTask "getGodmorgenStats returns None when there are no matches" {
-            do!
-                withMongoDatabase (fun database ->
+        yield!
+            testFixtureTask withMongoDatabase [
+                "getGodmorgenStats returns None when there are no matches",
+                (fun database ->
                     task {
                         let filter = Builders<Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, 123UL)
                         let! actual = getGodmorgenStats filter database
 
                         Expect.equal actual None "Expected no stats when collection has no matching documents"
-                    }
-                )
-        }
-
-        testTask "getGodmorgenStats maps a stored document to domain" {
-            do!
-                withMongoDatabase (fun database ->
+                    })
+                "getGodmorgenStats maps a stored document to domain",
+                (fun database ->
                     task {
                         let nowUtc = DateTimeOffset.UtcNow
 
@@ -312,13 +325,9 @@ let tests =
                             Expect.equal (Domain.DiscordUsername.value mapped.Username) dto.DiscordUsername "Username should map"
                             Expect.equal (Domain.GodmorgenCount.value mapped.Count) dto.GodmorgenCount "Count should map"
                             Expect.equal (Domain.GodmorgenStreak.value mapped.Streak) dto.GodmorgenStreak "Streak should map"
-                    }
-                )
-        }
-
-        testTask "getHereticUserIds returns users who have not written today in current month" {
-            do!
-                withMongoDatabase (fun database ->
+                    })
+                "getHereticUserIds returns users who have not written today in current month",
+                (fun database ->
                     task {
                         let nowUtc = DateTimeOffset.UtcNow
                         let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
@@ -371,13 +380,9 @@ let tests =
                         let actualIds = actual |> Array.map Domain.DiscordUserId.value |> Set.ofArray
 
                         Expect.equal actualIds (Set.ofList [ 11UL ]) "Only stale users in current month should be returned"
-                    }
-                )
-        }
-
-        testTask "getHereticUserIds returns distinct user ids" {
-            do!
-                withMongoDatabase (fun database ->
+                    })
+                "getHereticUserIds returns distinct user ids",
+                (fun database ->
                     task {
                         let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
                         let oldDate = DateTimeOffset.UtcNow.AddDays -2.0
@@ -421,8 +426,7 @@ let tests =
                         let actualIds = actual |> Array.map Domain.DiscordUserId.value |> Set.ofArray
 
                         Expect.equal actualIds (Set.ofList [ 21UL ; 22UL ]) "Returned heretic ids should be distinct"
-                    }
-                )
-        }
+                    })
+            ]
     ]
 #endif
