@@ -14,7 +14,7 @@ let getConnectionStringOrThrow (environmentVariableName : string)(config : IConf
     |> Option.defaultValue (failwith $"'{environmentVariableName}' connection string is missing in configuration.")
 
 let createContextOrThrow (configuration : IConfiguration) (logger : ILogger) =
-    let mongoConnectionString = getConnectionStringOrThrow "MongoDb" configuration
+    let mongoConnectionString = configuration |> getConnectionStringOrThrow "MongoDb"
 
     let channelId =
         configuration.GetValue<string> "ChannelId"
