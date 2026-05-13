@@ -8,10 +8,12 @@ open NetCord.Gateway
 open NetCord.Hosting.Gateway
 open NetCord.Hosting.Services.ApplicationCommands
 
-let getConnectionStringOrThrow (environmentVariableName : string)(config : IConfiguration) =
+let getConnectionStringOrThrow (environmentVariableName : string) (config : IConfiguration) =
     config.GetConnectionString environmentVariableName
     |> Option.ofObj
-    |> Option.defaultValue (failwith $"'{environmentVariableName}' connection string is missing in configuration.")
+    |> Option.defaultWith (fun () ->
+        failwith $"'{environmentVariableName}' connection string is missing in configuration."
+    )
 
 let createContextOrThrow (configuration : IConfiguration) (logger : ILogger) =
     let mongoConnectionString = configuration |> getConnectionStringOrThrow "MongoDb"
@@ -24,7 +26,7 @@ let createContextOrThrow (configuration : IConfiguration) (logger : ILogger) =
             | true, parsedValue -> Some parsedValue
             | false, _ -> None
         )
-        |> Option.defaultValue (
+        |> Option.defaultWith (fun () ->
             failwith
                 "Invalid 'ChannelId' value in configuration. Must be a valid unsigned 64-bit integer, saved as a string in the configuration."
         )
@@ -63,6 +65,9 @@ let host =
     Host
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun _ config ->
+            config.AddJsonFile ("appsettings.json", optional = false, reloadOnChange = true)
+            |> ignore
+
             config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true)
             |> ignore
         )
