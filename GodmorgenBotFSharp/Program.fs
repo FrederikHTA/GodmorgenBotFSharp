@@ -65,7 +65,7 @@ let host =
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun _ config ->
             config.AddJsonFile ("appsettings.json", optional = false, reloadOnChange = true) |> ignore
-            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true) |> ignore
+            config.AddJsonFile ("local.settings.json", optional = true, reloadOnChange = true) |> ignore
         )
         .ConfigureServices(configureServices)
         .Build ()
