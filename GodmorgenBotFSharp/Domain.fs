@@ -120,8 +120,8 @@ module GodmorgenStats =
         UserId = userId
         Username = username
         LastGodmorgenDate = now
-        Count = GodmorgenCount.create 1 |> Result.defaultWith (fun _ -> GodmorgenCount.zero)
-        Streak = GodmorgenStreak.create 1 |> Result.defaultWith (fun _ -> GodmorgenStreak.zero)
+        Count = GodmorgenCount.createUnsafe 1
+        Streak = GodmorgenStreak.createUnsafe 1
     }
 
     let hasWrittenGodmorgenToday (now : DateTimeOffset) (stats : GodmorgenStats) =

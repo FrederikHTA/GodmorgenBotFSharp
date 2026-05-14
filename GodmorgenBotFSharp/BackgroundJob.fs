@@ -6,7 +6,6 @@ open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open NetCord.Gateway
-open FsToolkit.ErrorHandling
 
 let private calculateNextRunAtUtc (nowUtc : DateTimeOffset) : DateTimeOffset =
     let rstNow = TimeZoneInfo.ConvertTime (nowUtc, Constants.romanStandardTime)
@@ -33,12 +32,12 @@ let private findAndDisgraceHeretics (gatewayClient : GatewayClient) (context : C
 
             let message = $"User(s) found guilty of heresy: %s{mentions}"
 
-            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) |> Task.ignore
+            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) :> Task
         else
             let message = "No heretics found today. All hail the righteous!"
             context.Logger.LogInformation "No heretics found."
 
-            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) |> Task.ignore
+            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) :> Task
     }
 
 type HereticBackgroundJob (context : Context, gatewayClient : GatewayClient) =
