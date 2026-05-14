@@ -50,3 +50,13 @@ module WordCount =
         Word = word
         Count = count
     }
+
+type PreviousAndCurrentGodmorgenCount = {
+    Previous : int
+    Current : int
+}
+
+type WordCounts = {
+    GWord : WordCount
+    MWord : WordCount
+}

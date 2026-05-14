@@ -13,16 +13,6 @@ let private mongoDatabaseName : string = "godmorgen"
 [<Literal>]
 let internal godmorgenStatsCollectionName : string = "godmorgen_stats"
 
-type PreviousAndCurrentGodmorgenCount = {
-    Previous : int
-    Current : int
-}
-
-type WordCounts = {
-    GWord : Types.WordCount
-    MWord : Types.WordCount
-}
-
 let createDatabase (connectionString : string) : IMongoDatabase =
     let mongoClient = new MongoClient (connectionString)
     mongoClient.GetDatabase mongoDatabaseName
@@ -36,7 +26,7 @@ let createUser (mongoDatabase : IMongoDatabase) (userId : uint64) (userName : st
         return newUser
     }
 
-let getGodmorgenStat (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Option<Domain.GodmorgenStats>> =
+let getGodmorgenStat (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats option> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -65,7 +55,10 @@ let getGodmorgenStats
         | None -> return None
     }
 
-let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<PreviousAndCurrentGodmorgenCount> =
+let removeUserPoint
+    (user : NetCord.User)
+    (mongoDatabase : IMongoDatabase)
+    : Task<Types.PreviousAndCurrentGodmorgenCount> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -73,10 +66,12 @@ let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Tas
 
         match godmorgenStatO with
         | None ->
-            return {
+            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
                 Previous = 0
                 Current = 0
             }
+
+            return godmorgenCounts
         | Some godmorgenStat ->
             let updatedGodmorgenStats =
                 godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount |> Mapper.fromDomain
@@ -85,13 +80,18 @@ let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Tas
 
             do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
 
-            return {
+            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
                 Previous = godmorgenStat.Count |> Domain.GodmorgenCount.value
                 Current = updatedGodmorgenStats.GodmorgenCount
             }
+
+            return godmorgenCounts
     }
 
-let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<PreviousAndCurrentGodmorgenCount> =
+let giveUserPoint
+    (user : NetCord.User)
+    (mongoDatabase : IMongoDatabase)
+    : Task<Types.PreviousAndCurrentGodmorgenCount> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -101,10 +101,12 @@ let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<
         | None ->
             let! newUser = createUser mongoDatabase user.Id user.Username
 
-            return {
+            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
                 Previous = 0
                 Current = newUser.GodmorgenCount
             }
+
+            return godmorgenCounts
         | Some godmorgenStats ->
             let updatedGodmorgenStats =
                 godmorgenStats
@@ -116,10 +118,12 @@ let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<
 
             do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
 
-            return {
+            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
                 Previous = godmorgenStats.Count |> Domain.GodmorgenCount.value
                 Current = updatedGodmorgenStats.GodmorgenCount
             }
+
+            return godmorgenCounts
     }
 
 let updateWordCount
@@ -173,7 +177,7 @@ let getWordCount
     (gWord : Domain.GWord)
     (mWord : Domain.MWord)
     (mongoDatabase : IMongoDatabase)
-    : Task<WordCounts> =
+    : Task<Types.WordCounts> =
     task {
         let gWordVal = Domain.GWord.value gWord
         let mWordVal = Domain.MWord.value mWord
@@ -194,17 +198,15 @@ let getWordCount
             |> Option.map (Types.WordCount.create word)
             |> Option.defaultValue (Types.WordCount.empty word)
 
-        return {
+        let wordCounts : Types.WordCounts = {
             GWord = findOrDefault gWordVal
             MWord = findOrDefault mWordVal
         }
+
+        return wordCounts
     }
 
-let recordDailyGodmorgen
-    (user : NetCord.User)
-    (utcNow : DateTimeOffset)
-    (mongoDatabase : IMongoDatabase)
-    : Task<bool> =
+let recordDailyGodmorgen (user : NetCord.User) (utcNow : DateTimeOffset) (mongoDatabase : IMongoDatabase) : Task<bool> =
     task {
         let! statO = getGodmorgenStat user.Id mongoDatabase
 
@@ -227,12 +229,17 @@ let recordDailyGodmorgen
             return true
     }
 
-let getStatsByMonth (month : int) (year : int) (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
+let getStatsByMonth
+    (month : int)
+    (year : int)
+    (mongoDatabase : IMongoDatabase)
+    : Task<Domain.GodmorgenStats array option> =
     let filter =
-        Builders<Types.GodmorgenStats>.Filter.And (
-            Builders<Types.GodmorgenStats>.Filter.Eq (_.Year, year),
-            Builders<Types.GodmorgenStats>.Filter.Eq (_.Month, month)
-        )
+        Builders<Types.GodmorgenStats>.Filter
+            .And (
+                Builders<Types.GodmorgenStats>.Filter.Eq (_.Year, year),
+                Builders<Types.GodmorgenStats>.Filter.Eq (_.Month, month)
+            )
 
     getGodmorgenStats filter mongoDatabase
 
