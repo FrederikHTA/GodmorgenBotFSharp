@@ -1,4 +1,4 @@
-module GodmorgenBotFSharp.Tests.MongoDb.Functions
+module GodmorgenBotFSharp.Tests.MongoDb.FunctionsIntegration
 
 open System
 open System.Threading.Tasks
@@ -51,49 +51,9 @@ let private seedGodmorgenStats
 
 [<Tests>]
 let tests =
-    testList "MongoDb.Functions tests" [
+    testList "MongoDb.Functions integration tests" [
         yield!
             testFixtureTask withMongoDatabase [
-                "getGodmorgenStats returns None when there are no matches",
-                (fun database ->
-                    task {
-                        let filter = Builders<Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, 123UL)
-                        let! actual = Functions.getGodmorgenStats filter database
-
-                        Expect.equal actual None "Expected no stats when collection has no matching documents"
-                    })
-                "getGodmorgenStats maps a stored document to domain",
-                (fun database ->
-                    task {
-                        let nowUtc = DateTimeOffset.UtcNow
-
-                        let dto : Types.GodmorgenStats = {
-                            Id = "42_seed"
-                            DiscordUserId = 42UL
-                            DiscordUsername = "test-user"
-                            LastGoodmorgenDate = nowUtc
-                            GodmorgenCount = 5
-                            GodmorgenStreak = 3
-                            Year = nowUtc.Year
-                            Month = nowUtc.Month
-                        }
-
-                        do! seedGodmorgenStats database [| dto |]
-
-                        let filter = Builders<Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, 42UL)
-                        let! actual = Functions.getGodmorgenStats filter database
-
-                        match actual with
-                        | None -> failtest "Expected one mapped domain record"
-                        | Some stats ->
-                            Expect.equal stats.Length 1 "Expected exactly one mapped domain record"
-
-                            let mapped = stats[0]
-                            Expect.equal (Domain.DiscordUserId.value mapped.UserId) dto.DiscordUserId "UserId should map"
-                            Expect.equal (Domain.DiscordUsername.value mapped.Username) dto.DiscordUsername "Username should map"
-                            Expect.equal (Domain.GodmorgenCount.value mapped.Count) dto.GodmorgenCount "Count should map"
-                            Expect.equal (Domain.GodmorgenStreak.value mapped.Streak) dto.GodmorgenStreak "Streak should map"
-                    })
                 "getHereticUserIds returns users who have not written today in current month",
                 (fun database ->
                     task {

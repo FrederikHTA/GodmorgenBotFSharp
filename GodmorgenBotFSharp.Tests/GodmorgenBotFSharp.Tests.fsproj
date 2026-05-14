@@ -11,6 +11,7 @@
     <ItemGroup>
         <Compile Include="Validation/ValidationTests.fs" />
         <Compile Include="Leaderboard/LeaderboardTests.fs" />
+        <Compile Include="MongoDb/MapperTests.fs" />
         <Compile Include="MongoDb/FunctionsTests.fs" />
     </ItemGroup>
 
