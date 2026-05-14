@@ -33,24 +33,24 @@ let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
             || not (Validation.isWithinGodmorgenHours ctx.TimeZone utcNow)
         then
             return ()
-
-        ctx.Logger.LogInformation (
-            "Processing godmorgen message: '{Message}' from '{User}'",
-            message.Content,
-            message.Author.Username
-        )
-
-
-        match Validation.parseGodmorgenMessage message.Content with
-        | Ok godmorgenMessage -> do! processGodmorgenMessage ctx message godmorgenMessage
-        | Error validationError ->
-            ctx.Logger.LogError (
-                "Failed to parse godmorgen words from message: '{Message}' from '{User}', error: '{Error}'",
+        else
+            ctx.Logger.LogInformation (
+                "Processing godmorgen message: '{Message}' from '{User}'",
                 message.Content,
-                message.Author.Username,
-                validationError
+                message.Author.Username
             )
 
-            ()
+
+            match Validation.parseGodmorgenMessage message.Content with
+            | Ok godmorgenMessage -> do! processGodmorgenMessage ctx message godmorgenMessage
+            | Error validationError ->
+                ctx.Logger.LogError (
+                    "Failed to parse godmorgen words from message: '{Message}' from '{User}', error: '{Error}'",
+                    message.Content,
+                    message.Author.Username,
+                    validationError
+                )
+
+                ()
     }
     |> ValueTask
