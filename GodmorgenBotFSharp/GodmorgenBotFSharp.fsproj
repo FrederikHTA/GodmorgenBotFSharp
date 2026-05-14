@@ -17,6 +17,7 @@
         <Compile Include="Validation.fs" />
         <Compile Include="MongoDb/Types.fs" />
         <Compile Include="MongoDb/Functions.fs" />
+        <Compile Include="Extensions.fs" />
         <Compile Include="Discord/Leaderboard.fs" />
         <Compile Include="Discord/MessageHandler.fs" />
         <Compile Include="Discord/SlashCommands.fs" />
@@ -37,7 +38,7 @@
     <ItemGroup>
         <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-        <PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+        <PackageReference Include="MongoDB.Driver" Version="3.8.1" />
         <PackageReference Include="NetCord" Version="1.0.0-alpha.448" />
         <PackageReference Include="NetCord.Hosting" Version="1.0.0-alpha.448" />
         <PackageReference Include="NetCord.Hosting.Services" Version="1.0.0-alpha.448" />

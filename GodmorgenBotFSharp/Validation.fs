@@ -26,8 +26,3 @@ let parseGodmorgenMessage (message : string) : Result<GodmorgenMessage, Validati
         | Error e, _ -> Error e
         | _, Error e -> Error e
     | _ -> Error ValidationError.InvalidMessage
-
-let isValidGodmorgenMessage (message : string) =
-    match parseGodmorgenMessage message with
-    | Ok _ -> true
-    | Error _ -> false

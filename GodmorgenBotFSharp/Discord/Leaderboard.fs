@@ -32,9 +32,7 @@ let getOverallRankings (godmorgenStats : Array<GodmorgenStats>) : string =
             let maxCount = group |> Array.map (fun s -> GodmorgenCount.value s.Count) |> Array.max
 
             group
-            |> Array.map (fun stat ->
-                stat.UserId, (if GodmorgenCount.value stat.Count = maxCount then 1 else 0)
-            )
+            |> Array.map (fun stat -> stat.UserId, (if GodmorgenCount.value stat.Count = maxCount then 1 else 0))
         )
         |> Array.groupBy fst
         |> Array.map (fun (userId, wins) -> userId, wins |> Array.sumBy snd)
@@ -46,8 +44,7 @@ let getOverallRankings (godmorgenStats : Array<GodmorgenStats>) : string =
         |> Array.mapi (fun i (winCount, group) ->
             let rank = i + 1
 
-            let userMentions =
-                group |> Array.map (fun (userId, _) -> $"<@%d{DiscordUserId.value userId}>")
+            let userMentions = group |> Array.map (fun (userId, _) -> $"<@%d{DiscordUserId.value userId}>")
 
             if group.Length = 1 then
                 $"The overall no: {getTrophyEmoji rank} {rank} is {userMentions.[0]} with {winCount} month(s) won."
@@ -71,7 +68,7 @@ let getMonthlyLeaderboards (godmorgenStats : Array<GodmorgenStats>) : Array<Mont
                 let monthName = abbreviatedMonthName month
 
                 if scoreGroup.Length = 1 then
-                    $"The no: {i + 1} of {monthName} {year} was <@{DiscordUserId.value scoreGroup.[0].UserId}> with a godmorgen count of: {count}"
+                    $"The no: {i + 1} of {monthName} {year} was <@%d{DiscordUserId.value scoreGroup.[0].UserId}> with a godmorgen count of: {count}"
                 else
                     let userMentions =
                         scoreGroup

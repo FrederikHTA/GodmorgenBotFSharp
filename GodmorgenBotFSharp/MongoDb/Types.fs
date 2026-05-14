@@ -2,18 +2,7 @@ module GodmorgenBotFSharp.MongoDb.Types
 
 open System
 open MongoDB.Bson.Serialization.Attributes
-
-type Error =
-    | NotFound
-    | InternalError
-    | DatabaseError
-
-module Error =
-    let toString error =
-        match error with
-        | NotFound -> $"Not found"
-        | InternalError -> $"Internal error"
-        | DatabaseError -> $"Internal error"
+open GodmorgenBotFSharp
 
 type GodmorgenStats = {
     [<BsonId>]
@@ -31,18 +20,6 @@ module GodmorgenStats =
     let createMongoId (userId : uint64) (date : DateOnly) : string =
         $"{userId}_{date.Month}_{date.Year}"
 
-    let hasWrittenGodmorgenToday (stats : GodmorgenBotFSharp.Domain.GodmorgenStats) : bool =
-        let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
-        let lastWrittenDateUtc = DateOnly.FromDateTime stats.LastGodmorgenDate.UtcDateTime
-        lastWrittenDateUtc = todayUtc
-
-    let increaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
-        stats with
-            LastGoodmorgenDate = DateTimeOffset.UtcNow
-            GodmorgenCount = stats.GodmorgenCount + 1
-            GodmorgenStreak = stats.GodmorgenStreak + 1
-    }
-
     let create (userId : uint64) (userName : string) : GodmorgenStats =
         let utcNow = DateTimeOffset.UtcNow
 
@@ -56,6 +33,34 @@ module GodmorgenStats =
             Year = utcNow.Year
             Month = utcNow.Month
         }
+
+    let toDomain (dto : GodmorgenStats) : Domain.GodmorgenStats =
+        let username = Domain.DiscordUsername.createUnsafe dto.DiscordUsername
+        let count = Domain.GodmorgenCount.createUnsafe dto.GodmorgenCount
+        let streak = Domain.GodmorgenStreak.createUnsafe dto.GodmorgenStreak
+
+        {
+            UserId = Domain.DiscordUserId.create dto.DiscordUserId
+            Username = username
+            LastGodmorgenDate = dto.LastGoodmorgenDate
+            Count = count
+            Streak = streak
+        }
+
+    let fromDomain (domain : Domain.GodmorgenStats) : GodmorgenStats = {
+        Id =
+            createMongoId
+                (Domain.DiscordUserId.value domain.UserId)
+                (DateOnly.FromDateTime domain.LastGodmorgenDate.UtcDateTime)
+        DiscordUserId = Domain.DiscordUserId.value domain.UserId
+        DiscordUsername = Domain.DiscordUsername.value domain.Username
+        LastGoodmorgenDate = domain.LastGodmorgenDate
+        GodmorgenCount = Domain.GodmorgenCount.value domain.Count
+        GodmorgenStreak = Domain.GodmorgenStreak.value domain.Streak
+        Year = domain.LastGodmorgenDate.Year
+        Month = domain.LastGodmorgenDate.Month
+    }
+
 
 type WordCount = {
     [<BsonId>]
