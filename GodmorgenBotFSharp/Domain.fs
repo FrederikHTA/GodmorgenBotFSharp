@@ -52,8 +52,6 @@ module GodmorgenCount =
     let decrement (GodmorgenCount count) =
         GodmorgenCount (Math.Max (0, count - 1))
 
-    let zero = GodmorgenCount 0
-
 type GodmorgenStreak = private GodmorgenStreak of int
 
 module GodmorgenStreak =
@@ -73,8 +71,6 @@ module GodmorgenStreak =
 
     let decrement (GodmorgenStreak streak) =
         GodmorgenStreak (Math.Max (0, streak - 1))
-
-    let zero = GodmorgenStreak 0
 
 type GWord = private GWord of string
 

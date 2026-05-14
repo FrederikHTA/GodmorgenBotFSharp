@@ -6,14 +6,12 @@
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <IsPackable>false</IsPackable>
-        <GenerateProgramFile>false</GenerateProgramFile>
     </PropertyGroup>
 
     <ItemGroup>
         <Compile Include="Validation/ValidationTests.fs" />
         <Compile Include="Leaderboard/LeaderboardTests.fs" />
         <Compile Include="MongoDb/FunctionsTests.fs" />
-        <Compile Include="Program.fs" />
     </ItemGroup>
 
     <ItemGroup>
