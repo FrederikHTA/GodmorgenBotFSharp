@@ -200,6 +200,18 @@ let getWordCount
         }
     }
 
+let getStatsByMonth (month : int) (year : int) (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
+    let filter =
+        Builders<Types.GodmorgenStats>.Filter.And (
+            Builders<Types.GodmorgenStats>.Filter.Eq (_.Year, year),
+            Builders<Types.GodmorgenStats>.Filter.Eq (_.Month, month)
+        )
+
+    getGodmorgenStats filter mongoDatabase
+
+let getAllStats (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
+    getGodmorgenStats Builders<Types.GodmorgenStats>.Filter.Empty mongoDatabase
+
 let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<Types.WordCount array option> =
     task {
         let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"

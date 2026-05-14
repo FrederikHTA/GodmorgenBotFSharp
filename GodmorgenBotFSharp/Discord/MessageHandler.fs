@@ -3,9 +3,7 @@ module GodmorgenBotFSharp.MessageHandler
 open System
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
-open MongoDB.Driver
 open NetCord.Gateway
-open FsToolkit.ErrorHandling
 
 let private buildGreeting (authorId : uint64) =
     if authorId = Constants.ConlonDiscordUserId then
@@ -29,7 +27,8 @@ let private processGodmorgenMessage (ctx : Context) (message : Message) (godmorg
                 ctx.MongoDataBase
                 |> MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord
 
-            do! message.ReplyAsync (buildGreeting message.Author.Id) |> Task.ignore
+            let! _ = message.ReplyAsync (buildGreeting message.Author.Id)
+            ()
     }
 
 let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =

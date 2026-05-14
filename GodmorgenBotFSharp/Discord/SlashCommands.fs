@@ -3,12 +3,9 @@ module GodmorgenBotFSharp.SlashCommands
 open System
 open System.Threading.Tasks
 open GodmorgenBotFSharp.Domain
-open GodmorgenBotFSharp.MongoDb.Types
-open MongoDB.Driver
 open Microsoft.Extensions.Logging
 open NetCord.Gateway
 open NetCord.Services.ApplicationCommands
-open FsToolkit.ErrorHandling
 
 let private requireAdmin (ctx : ApplicationCommandContext) (f : unit -> Task<string>) =
     if ctx.User.Id = Constants.PuffyDiscordUserId then
@@ -23,17 +20,7 @@ let leaderboardCommand (ctx : Context) =
         task {
             ctx.Logger.LogInformation "Got leaderboard command request"
             let today = DateTime.UtcNow.Date
-            let targetMonth = today.Month
-            let targetYear = today.Year
-
-            let filter =
-                Builders<GodmorgenStats>.Filter
-                    .And (
-                        Builders<GodmorgenStats>.Filter.Eq (_.Year, targetYear),
-                        Builders<GodmorgenStats>.Filter.Eq (_.Month, targetMonth)
-                    )
-
-            let! result = MongoDb.Functions.getGodmorgenStats filter ctx.MongoDataBase
+            let! result = MongoDb.Functions.getStatsByMonth today.Month today.Year ctx.MongoDataBase
 
             match result with
             | Some stats -> return Leaderboard.getCurrentMonthLeaderboard stats
@@ -173,9 +160,7 @@ let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
     AllTimeLeaderboardDelegate (fun _ ->
         task {
             ctx.Logger.LogInformation "Got alltimeleaderboard command request"
-            let filter = Builders<GodmorgenStats>.Filter.Empty
-
-            let! result = MongoDb.Functions.getGodmorgenStats filter ctx.MongoDataBase
+            let! result = MongoDb.Functions.getAllStats ctx.MongoDataBase
 
             match result with
             | None -> return "No one has said godmorgen yet."
@@ -196,9 +181,8 @@ let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
                     )
 
                 for monthlyMessage in monthlyMessages do
-                    do!
-                        gatewayClient.Rest.SendMessageAsync (ctx.DiscordChannelInfo.ChannelId, monthlyMessage)
-                        |> Task.ignore
+                    let! _ = gatewayClient.Rest.SendMessageAsync (ctx.DiscordChannelInfo.ChannelId, monthlyMessage)
+                    ()
 
                 return $"Overall Ranking:{Environment.NewLine}{overallRankings}"
         }
