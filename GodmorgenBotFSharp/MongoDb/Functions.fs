@@ -46,21 +46,21 @@ let getGodmorgenStat (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<O
             collection.Find(fun x -> x.Id = mongoId).SingleOrDefaultAsync () |> Task.map Option.ofObj
 
         match godmorgenStatDto with
-        | Some dto -> return dto |> Types.GodmorgenStats.toDomain |> Some
+        | Some dto -> return dto |> Mapper.toDomain |> Some
         | None -> return None
     }
 
 let getGodmorgenStats
     (filter : FilterDefinition<Types.GodmorgenStats>)
     (mongoDatabase : IMongoDatabase)
-    : Task<Option<Array<Domain.GodmorgenStats>>> =
+    : Task<Domain.GodmorgenStats array option> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
         let! godmorgenStatDtos = collection.Find(filter).ToListAsync () |> Task.map Option.ofObj
 
         match godmorgenStatDtos with
-        | Some dtos when dtos.Count > 0 -> return dtos |> Seq.map Types.GodmorgenStats.toDomain |> Seq.toArray |> Some
+        | Some dtos when dtos.Count > 0 -> return dtos |> Seq.map Mapper.toDomain |> Seq.toArray |> Some
         | Some _ -> return None
         | None -> return None
     }
@@ -79,7 +79,7 @@ let removeUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Tas
             }
         | Some godmorgenStat ->
             let updatedGodmorgenStats =
-                godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount |> Types.GodmorgenStats.fromDomain
+                godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount |> Mapper.fromDomain
 
             let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
 
@@ -107,7 +107,10 @@ let giveUserPoint (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<
             }
         | Some godmorgenStats ->
             let updatedGodmorgenStats =
-                Domain.GodmorgenStats.incrementGodmorgenCount godmorgenStats |> Types.GodmorgenStats.fromDomain
+                godmorgenStats
+                |> Domain.GodmorgenStats.updateLastGodmorgenDate DateTimeOffset.UtcNow
+                |> Domain.GodmorgenStats.incrementGodmorgenCount
+                |> Mapper.fromDomain
 
             let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
 
@@ -142,7 +145,7 @@ let updateWordCount
         return ()
     }
 
-let getHereticUserIds (utcNow : DateOnly) (mongoDatabase : IMongoDatabase) : Task<Array<Domain.DiscordUserId>> =
+let getHereticUserIds (utcNow : DateOnly) (mongoDatabase : IMongoDatabase) : Task<Domain.DiscordUserId array> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
@@ -197,7 +200,7 @@ let getWordCount
         }
     }
 
-let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<Option<Array<Types.WordCount>>> =
+let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<Types.WordCount array option> =
     task {
         let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"
 

@@ -1,4 +1,5 @@
-﻿open GodmorgenBotFSharp
+open System
+open GodmorgenBotFSharp
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
@@ -6,7 +7,30 @@ open Microsoft.Extensions.Logging
 open NetCord.Gateway
 open NetCord.Hosting.Gateway
 open NetCord.Hosting.Services.ApplicationCommands
-open GodmorgenBotFSharp
+
+let private createContext (configuration : IConfiguration) (logger : ILogger) : Context =
+    let mongoConnectionString =
+        configuration.GetConnectionString "MongoDb"
+        |> Option.ofObj
+        |> Option.defaultWith (fun () -> failwith "'MongoDb' connection string is missing in configuration.")
+
+    let channelId =
+        configuration.GetValue<string> "ChannelId"
+        |> Option.ofObj
+        |> Option.bind (fun value ->
+            match UInt64.TryParse value with
+            | true, parsed -> Some parsed
+            | false, _ -> None
+        )
+        |> Option.defaultWith (fun () ->
+            failwith "'ChannelId' is missing or not a valid uint64 in configuration."
+        )
+
+    {
+        MongoDataBase = MongoDb.Functions.createDatabase mongoConnectionString
+        Logger = logger
+        DiscordChannelInfo = { ChannelId = channelId }
+    }
 
 let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceCollection) =
     serviceCollection.AddDiscordGateway (fun options ->
@@ -21,19 +45,17 @@ let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceColl
 
     serviceCollection.AddApplicationCommands () |> ignore
 
-    serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun sp ->
-        let logger = sp.GetRequiredService<ILogger<BackgroundJob.HereticBackgroundJob>> ()
-        let gatewayClient = sp.GetRequiredService<GatewayClient> ()
-        let configuration = sp.GetRequiredService<IConfiguration> ()
-        let ctx = configuration.createContextOrThrow logger
-        new BackgroundJob.HereticBackgroundJob (ctx, gatewayClient)
-    )
-    |> ignore
-
     serviceCollection.AddSingleton<Context> (fun sp ->
         let logger = sp.GetRequiredService<ILogger<Context>> ()
         let configuration = sp.GetRequiredService<IConfiguration> ()
-        configuration.createContextOrThrow logger
+        createContext configuration logger
+    )
+    |> ignore
+
+    serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun sp ->
+        let context = sp.GetRequiredService<Context> ()
+        let gatewayClient = sp.GetRequiredService<GatewayClient> ()
+        new BackgroundJob.HereticBackgroundJob (context, gatewayClient)
     )
     |> ignore
 
@@ -42,7 +64,7 @@ let host =
         .CreateDefaultBuilder()
         .ConfigureAppConfiguration(fun _ config ->
             config.AddJsonFile ("appsettings.json", optional = false, reloadOnChange = true) |> ignore
-            config.AddJsonFile ("local.settings.json", optional = false, reloadOnChange = true) |> ignore
+            config.AddJsonFile ("local.settings.json", optional = true, reloadOnChange = true) |> ignore
         )
         .ConfigureServices(configureServices)
         .Build ()

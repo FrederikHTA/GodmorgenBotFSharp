@@ -11,7 +11,7 @@ type MonthYear = {
 
 type MonthlyRank = {
     MonthYear : MonthYear
-    Rankings : Array<string>
+    Rankings : string array
 }
 
 let private getTrophyEmoji (rank : int) : string =
@@ -24,7 +24,7 @@ let private getTrophyEmoji (rank : int) : string =
 let abbreviatedMonthName (month : int) : string =
     DateTimeFormatInfo.CurrentInfo.GetAbbreviatedMonthName month
 
-let getOverallRankings (godmorgenStats : Array<GodmorgenStats>) : string =
+let getOverallRankings (godmorgenStats : GodmorgenStats array) : string =
     let userWinCount =
         godmorgenStats
         |> Array.groupBy (fun stat -> stat.LastGodmorgenDate.Year, stat.LastGodmorgenDate.Month)
@@ -55,7 +55,7 @@ let getOverallRankings (godmorgenStats : Array<GodmorgenStats>) : string =
 
     String.concat Environment.NewLine overallRanking
 
-let getMonthlyLeaderboards (godmorgenStats : Array<GodmorgenStats>) : Array<MonthlyRank> =
+let getMonthlyLeaderboards (godmorgenStats : GodmorgenStats array) : MonthlyRank array =
     godmorgenStats
     |> Array.groupBy (fun stat -> stat.LastGodmorgenDate.Year, stat.LastGodmorgenDate.Month)
     |> Array.sortByDescending (fun ((year, month), _) -> year, month)

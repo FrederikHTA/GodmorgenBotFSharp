@@ -13,14 +13,6 @@ let private buildGreeting (authorId : uint64) =
     else
         $"Godmorgen <@{authorId}>! :sun_with_face:"
 
-let private buildAuthorFilter (date : DateTime) (authorId : uint64) : FilterDefinition<MongoDb.Types.GodmorgenStats> =
-    Builders<MongoDb.Types.GodmorgenStats>.Filter
-        .And (
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Year, date.Year),
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.Month, date.Month),
-            Builders<MongoDb.Types.GodmorgenStats>.Filter.Eq (_.DiscordUserId, authorId)
-        )
-
 let private processGodmorgenMessage (ctx : Context) (message : Message) (godmorgenMessage : Domain.GodmorgenMessage) =
     task {
         let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStat message.Author.Id

@@ -127,12 +127,8 @@ module GodmorgenStats =
     let hasWrittenGodmorgenToday (now : DateTimeOffset) (stats : GodmorgenStats) =
         stats.LastGodmorgenDate.Date = now.Date
 
-    let recordGodmorgen (now : DateTimeOffset) (stats : GodmorgenStats) = {
-        stats with
-            LastGodmorgenDate = now
-            Count = GodmorgenCount.increment stats.Count
-            Streak = GodmorgenStreak.increment stats.Streak
-    }
+    let updateLastGodmorgenDate (now : DateTimeOffset) (stats : GodmorgenStats) : GodmorgenStats =
+        { stats with LastGodmorgenDate = now }
 
     let incrementGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
         stats with
@@ -141,11 +137,8 @@ module GodmorgenStats =
     }
 
     let decreaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats =
-        let count = GodmorgenCount.value stats.Count
-        let streak = GodmorgenStreak.value stats.Streak
-
         {
             stats with
-                Count = Math.Max (0, count - 1) |> GodmorgenCount.createUnsafe
-                Streak = Math.Max (0, streak - 1) |> GodmorgenStreak.createUnsafe
+                Count = GodmorgenCount.decrement stats.Count
+                Streak = GodmorgenStreak.decrement stats.Streak
         }
