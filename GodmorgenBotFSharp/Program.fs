@@ -30,6 +30,7 @@ let private createContext (configuration : IConfiguration) (logger : ILogger) : 
         MongoDataBase = MongoDb.Functions.createDatabase mongoConnectionString
         Logger = logger
         DiscordChannelInfo = { ChannelId = channelId }
+        TimeZone = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
     }
 
 let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceCollection) =

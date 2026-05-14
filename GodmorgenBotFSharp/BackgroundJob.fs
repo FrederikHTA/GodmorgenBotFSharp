@@ -7,15 +7,15 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open NetCord.Gateway
 
-let private calculateNextRunAtUtc (nowUtc : DateTimeOffset) : DateTimeOffset =
-    let rstNow = TimeZoneInfo.ConvertTime (nowUtc, Constants.romanStandardTime)
+let private calculateNextRunAtUtc (timeZone : TimeZoneInfo) (nowUtc : DateTimeOffset) : DateTimeOffset =
+    let rstNow = TimeZoneInfo.ConvertTime (nowUtc, timeZone)
 
     let nextRunDateInRst = if rstNow.Hour < 9 then rstNow.Date else rstNow.Date.AddDays 1.0
 
     let nextRunInRst =
         DateTime (nextRunDateInRst.Year, nextRunDateInRst.Month, nextRunDateInRst.Day, 9, 0, 0, nextRunDateInRst.Kind)
 
-    let nextRunUtc = TimeZoneInfo.ConvertTimeToUtc (nextRunInRst, Constants.romanStandardTime)
+    let nextRunUtc = TimeZoneInfo.ConvertTimeToUtc (nextRunInRst, timeZone)
     DateTimeOffset (nextRunUtc, TimeSpan.Zero)
 
 let private findAndDisgraceHeretics (gatewayClient : GatewayClient) (context : Context) =
@@ -50,20 +50,20 @@ type HereticBackgroundJob (context : Context, gatewayClient : GatewayClient) =
             try
                 while not token.IsCancellationRequested do
                     let nowUtc = DateTimeOffset.UtcNow
-                    let nextRunAtUtc = calculateNextRunAtUtc nowUtc
+                    let nextRunAtUtc = calculateNextRunAtUtc context.TimeZone nowUtc
                     let delay = nextRunAtUtc - nowUtc
 
                     context.Logger.LogInformation (
                         "Next heresy check scheduled for {RunAtUtc} UTC ({RunAtRst} RST)",
                         nextRunAtUtc,
-                        TimeZoneInfo.ConvertTime (nextRunAtUtc, Constants.romanStandardTime)
+                        TimeZoneInfo.ConvertTime (nextRunAtUtc, context.TimeZone)
                     )
 
                     do! Task.Delay (delay, token)
 
                     let runNowUtc = DateTimeOffset.UtcNow
 
-                    if not (Validation.isWeekend runNowUtc) then
+                    if not (Validation.isWeekend context.TimeZone runNowUtc) then
                         try
                             do! findAndDisgraceHeretics gatewayClient context
                         with ex ->

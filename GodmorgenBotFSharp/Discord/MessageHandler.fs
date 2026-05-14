@@ -29,8 +29,8 @@ let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
 
         if
             message.Author.IsBot
-            || Validation.isWeekend utcNow
-            || not (Validation.isWithinGodmorgenHours utcNow)
+            || Validation.isWeekend ctx.TimeZone utcNow
+            || not (Validation.isWithinGodmorgenHours ctx.TimeZone utcNow)
         then
             return ()
 

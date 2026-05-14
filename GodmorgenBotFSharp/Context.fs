@@ -1,5 +1,6 @@
 namespace GodmorgenBotFSharp
 
+open System
 open Microsoft.Extensions.Logging
 open MongoDB.Driver
 
@@ -9,4 +10,5 @@ type Context = {
     MongoDataBase : IMongoDatabase
     Logger : ILogger
     DiscordChannelInfo : DiscordChannelInfo
+    TimeZone : TimeZoneInfo
 }
