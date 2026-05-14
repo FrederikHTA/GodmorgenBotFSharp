@@ -200,6 +200,33 @@ let getWordCount
         }
     }
 
+let recordDailyGodmorgen
+    (user : NetCord.User)
+    (utcNow : DateTimeOffset)
+    (mongoDatabase : IMongoDatabase)
+    : Task<bool> =
+    task {
+        let! statO = getGodmorgenStat user.Id mongoDatabase
+
+        match statO with
+        | Some stat when Domain.GodmorgenStats.hasWrittenGodmorgenToday utcNow stat -> return false
+        | Some stat ->
+            let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
+
+            let updated =
+                stat
+                |> Domain.GodmorgenStats.updateLastGodmorgenDate utcNow
+                |> Domain.GodmorgenStats.incrementGodmorgenCount
+                |> Mapper.fromDomain
+
+            let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime utcNow.UtcDateTime)
+            do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updated) |> Task.ignore
+            return true
+        | None ->
+            do! createUser mongoDatabase user.Id user.Username |> Task.ignore
+            return true
+    }
+
 let getStatsByMonth (month : int) (year : int) (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
     let filter =
         Builders<Types.GodmorgenStats>.Filter.And (

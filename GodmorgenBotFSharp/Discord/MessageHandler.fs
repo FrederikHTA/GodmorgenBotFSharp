@@ -13,19 +13,11 @@ let private buildGreeting (authorId : uint64) =
 
 let private processGodmorgenMessage (ctx : Context) (message : Message) (godmorgenMessage : Domain.GodmorgenMessage) =
     task {
-        let! godmorgenStatsO = ctx.MongoDataBase |> MongoDb.Functions.getGodmorgenStat message.Author.Id
+        let! pointRecorded =
+            MongoDb.Functions.recordDailyGodmorgen message.Author DateTimeOffset.UtcNow ctx.MongoDataBase
 
-        let hasAlreadyWrittenToday =
-            godmorgenStatsO
-            |> Option.map (Domain.GodmorgenStats.hasWrittenGodmorgenToday DateTimeOffset.UtcNow)
-            |> Option.defaultValue false
-
-        if not hasAlreadyWrittenToday then
-            let! _ = ctx.MongoDataBase |> MongoDb.Functions.giveUserPoint message.Author
-
-            let! _ =
-                ctx.MongoDataBase
-                |> MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord
+        if pointRecorded then
+            do! MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord ctx.MongoDataBase
 
             let! _ = message.ReplyAsync (buildGreeting message.Author.Id)
             ()
