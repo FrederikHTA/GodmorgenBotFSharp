@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open GodmorgenBotFSharp.Domain
 open Microsoft.Extensions.Logging
+open MongoDB.Driver
 open NetCord.Gateway
 open NetCord.Services.ApplicationCommands
 
@@ -15,12 +16,12 @@ let private requireAdmin (ctx : ApplicationCommandContext) (f : unit -> Task<str
 
 type LeaderboardDelegate = delegate of unit -> Task<string>
 
-let leaderboardCommand (ctx : Context) =
+let leaderboardCommand (db : IMongoDatabase) (logger : ILogger) =
     LeaderboardDelegate (fun _ ->
         task {
-            ctx.Logger.LogInformation "Got leaderboard command request"
+            logger.LogInformation "Got leaderboard command request"
             let today = DateTime.UtcNow.Date
-            let! result = MongoDb.Functions.getStatsByMonth today.Month today.Year ctx.MongoDataBase
+            let! result = MongoDb.Functions.getStatsByMonth today.Month today.Year db
 
             match result with
             | Some stats -> return Leaderboard.getCurrentMonthLeaderboard stats
@@ -30,18 +31,17 @@ let leaderboardCommand (ctx : Context) =
 
 type WordCountDelegate = delegate of NetCord.User * gWord : string * mWord : string -> Task<string>
 
-let wordCountCommand (ctx : Context) =
+let wordCountCommand (db : IMongoDatabase) (logger : ILogger) =
     WordCountDelegate (fun user gWordStr mWordStr ->
         task {
-            ctx.Logger.LogInformation ("Got wordcount command request for {User}", user.Username)
+            logger.LogInformation ("Got wordcount command request for {User}", user.Username)
 
-            // Domain validation
             let gWordResult = GWord.create gWordStr
             let mWordResult = MWord.create mWordStr
 
             match gWordResult, mWordResult with
             | Ok gWord, Ok mWord ->
-                let! wordCounts = MongoDb.Functions.getWordCount user gWord mWord ctx.MongoDataBase
+                let! wordCounts = MongoDb.Functions.getWordCount user gWord mWord db
 
                 return
                     $"The user <@{user.Id}> has used the word {gWordStr} {wordCounts.GWord.Count} times "
@@ -56,13 +56,13 @@ type GiveUserPointWithWordsDelegate =
         commandContext : ApplicationCommandContext * user : NetCord.User * gWord : string * mWord : string ->
             Task<string>
 
-let giveUserPointWithWordsCommand (ctx : Context) =
+let giveUserPointWithWordsCommand (db : IMongoDatabase) (logger : ILogger) =
     GiveUserPointWithWordsDelegate (fun commandContext user gWordStr mWordStr ->
         requireAdmin
             commandContext
             (fun () ->
                 task {
-                    ctx.Logger.LogInformation (
+                    logger.LogInformation (
                         "Got giveuserpointwithwords command request for {User}",
                         user.Username,
                         commandContext.User.Username
@@ -73,9 +73,9 @@ let giveUserPointWithWordsCommand (ctx : Context) =
 
                     match gWordResult, mWordResult with
                     | Ok gWord, Ok mWord ->
-                        let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user ctx.MongoDataBase
+                        let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user db
 
-                        do! MongoDb.Functions.updateWordCount user gWord mWord ctx.MongoDataBase
+                        do! MongoDb.Functions.updateWordCount user gWord mWord db
 
                         return
                             $"User <@{user.Id}> has been given a point from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!, "
@@ -88,19 +88,19 @@ let giveUserPointWithWordsCommand (ctx : Context) =
 
 type GiveUserPointDelegate = delegate of commandContext : ApplicationCommandContext * NetCord.User -> Task<string>
 
-let giveUserPointCommand (ctx : Context) =
+let giveUserPointCommand (db : IMongoDatabase) (logger : ILogger) =
     GiveUserPointDelegate (fun commandContext user ->
         requireAdmin
             commandContext
             (fun () ->
                 task {
-                    ctx.Logger.LogInformation (
+                    logger.LogInformation (
                         "Got giveuserpoint command request for {User} requested by {Caller}",
                         user.Username,
                         commandContext.User.Username
                     )
 
-                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user ctx.MongoDataBase
+                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user db
 
                     return
                         $"User <@{user.Id}> has been given a point from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
@@ -110,19 +110,19 @@ let giveUserPointCommand (ctx : Context) =
 
 type RemovePointDelegate = delegate of commandContext : ApplicationCommandContext * NetCord.User -> Task<string>
 
-let removePointCommand (ctx : Context) =
+let removePointCommand (db : IMongoDatabase) (logger : ILogger) =
     RemovePointDelegate (fun commandContext user ->
         requireAdmin
             commandContext
             (fun () ->
                 task {
-                    ctx.Logger.LogInformation (
+                    logger.LogInformation (
                         "Got RemovePoint command command request for {User} requested by {Caller}",
                         user.Username,
                         commandContext.User.Username
                     )
 
-                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.removeUserPoint user ctx.MongoDataBase
+                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.removeUserPoint user db
 
                     return
                         $"User <@{user.Id}> has had a point removed from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
@@ -132,12 +132,12 @@ let removePointCommand (ctx : Context) =
 
 type TopWordsDelegate = delegate of NetCord.User -> Task<string>
 
-let topWordsCommand (ctx : Context) =
+let topWordsCommand (db : IMongoDatabase) (logger : ILogger) =
     TopWordsDelegate (fun user ->
         task {
-            ctx.Logger.LogInformation ("Got topwords command request for {User}", user.Username)
+            logger.LogInformation ("Got topwords command request for {User}", user.Username)
 
-            let! top5WordsO = MongoDb.Functions.getTop5Words user ctx.MongoDataBase
+            let! top5WordsO = MongoDb.Functions.getTop5Words user db
 
             match top5WordsO with
             | Some top5Words when not (Array.isEmpty top5Words) ->
@@ -149,18 +149,18 @@ let topWordsCommand (ctx : Context) =
                 return $"The top 5 words for <@{user.Id}> are: {Environment.NewLine}{wordsFormatted}"
             | Some _ -> return "No words found for the user."
             | None ->
-                ctx.Logger.LogError "Failed to get top words"
+                logger.LogError "Failed to get top words"
                 return "Failed to get top words."
         }
     )
 
 type AllTimeLeaderboardDelegate = delegate of unit -> Task<string>
 
-let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
+let allTimeLeaderboardCommand (db : IMongoDatabase) (logger : ILogger) (channelId : uint64) (gatewayClient : GatewayClient) =
     AllTimeLeaderboardDelegate (fun _ ->
         task {
-            ctx.Logger.LogInformation "Got alltimeleaderboard command request"
-            let! result = MongoDb.Functions.getAllStats ctx.MongoDataBase
+            logger.LogInformation "Got alltimeleaderboard command request"
+            let! result = MongoDb.Functions.getAllStats db
 
             match result with
             | None -> return "No one has said godmorgen yet."
@@ -181,7 +181,7 @@ let allTimeLeaderboardCommand (ctx : Context) (gatewayClient : GatewayClient) =
                     )
 
                 for monthlyMessage in monthlyMessages do
-                    let! _ = gatewayClient.Rest.SendMessageAsync (ctx.DiscordChannelInfo.ChannelId, monthlyMessage)
+                    let! _ = gatewayClient.Rest.SendMessageAsync (channelId, monthlyMessage)
                     ()
 
                 return $"Overall Ranking:{Environment.NewLine}{overallRankings}"

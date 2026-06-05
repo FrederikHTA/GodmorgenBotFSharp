@@ -4,34 +4,22 @@ open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
+open MongoDB.Driver
 open NetCord.Gateway
 open NetCord.Hosting.Gateway
 open NetCord.Hosting.Services.ApplicationCommands
 
-let private createContext (configuration : IConfiguration) (logger : ILogger) : Context =
-    let mongoConnectionString =
-        configuration.GetConnectionString "MongoDb"
-        |> Option.ofObj
-        |> Option.defaultWith (fun () -> failwith "'MongoDb' connection string is missing in configuration.")
-
-    let channelId =
-        configuration.GetValue<string> "ChannelId"
-        |> Option.ofObj
-        |> Option.bind (fun value ->
-            match UInt64.TryParse value with
-            | true, parsed -> Some parsed
-            | false, _ -> None
-        )
-        |> Option.defaultWith (fun () ->
-            failwith "'ChannelId' is missing or not a valid uint64 in configuration."
-        )
-
-    {
-        MongoDataBase = MongoDb.Functions.createDatabase mongoConnectionString
-        Logger = logger
-        DiscordChannelInfo = { ChannelId = channelId }
-        TimeZone = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
-    }
+let private parseChannelId (configuration : IConfiguration) =
+    configuration.GetValue<string> "ChannelId"
+    |> Option.ofObj
+    |> Option.bind (fun value ->
+        match UInt64.TryParse value with
+        | true, parsed -> Some parsed
+        | false, _ -> None
+    )
+    |> Option.defaultWith (fun () ->
+        failwith "'ChannelId' is missing or not a valid uint64 in configuration."
+    )
 
 let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceCollection) =
     serviceCollection.AddDiscordGateway (fun options ->
@@ -46,17 +34,26 @@ let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceColl
 
     serviceCollection.AddApplicationCommands () |> ignore
 
-    serviceCollection.AddSingleton<Context> (fun sp ->
-        let logger = sp.GetRequiredService<ILogger<Context>> ()
+    serviceCollection.AddSingleton<IMongoDatabase> (fun sp ->
         let configuration = sp.GetRequiredService<IConfiguration> ()
-        createContext configuration logger
+
+        let mongoConnectionString =
+            configuration.GetConnectionString "MongoDb"
+            |> Option.ofObj
+            |> Option.defaultWith (fun () -> failwith "'MongoDb' connection string is missing in configuration.")
+
+        MongoDb.Functions.createDatabase mongoConnectionString
     )
     |> ignore
 
     serviceCollection.AddHostedService<BackgroundJob.HereticBackgroundJob> (fun sp ->
-        let context = sp.GetRequiredService<Context> ()
+        let db = sp.GetRequiredService<IMongoDatabase> ()
+        let logger = sp.GetRequiredService<ILogger<BackgroundJob.HereticBackgroundJob>> ()
+        let configuration = sp.GetRequiredService<IConfiguration> ()
+        let channelId = parseChannelId configuration
+        let timeZone = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
         let gatewayClient = sp.GetRequiredService<GatewayClient> ()
-        new BackgroundJob.HereticBackgroundJob (context, gatewayClient)
+        new BackgroundJob.HereticBackgroundJob (db, logger, channelId, timeZone, gatewayClient)
     )
     |> ignore
 
@@ -71,52 +68,57 @@ let host =
         .Build ()
 
 let gatewayClient = host.Services.GetRequiredService<GatewayClient> ()
-let ctx = host.Services.GetRequiredService<Context> ()
+let db = host.Services.GetRequiredService<IMongoDatabase> ()
+let loggerFactory = host.Services.GetRequiredService<ILoggerFactory> ()
+let logger = loggerFactory.CreateLogger "GodmorgenBotFSharp"
+let configuration = host.Services.GetRequiredService<IConfiguration> ()
+let channelId = parseChannelId configuration
+let timeZone = TimeZoneInfo.FindSystemTimeZoneById "Romance Standard Time"
 
-gatewayClient.add_MessageCreate (MessageHandler.onDiscordMessage ctx)
+gatewayClient.add_MessageCreate (MessageHandler.onDiscordMessage db logger timeZone)
 
 host.AddSlashCommand (
     "leaderboard",
     "This command shows the current leaderboard status",
-    SlashCommands.leaderboardCommand ctx
+    SlashCommands.leaderboardCommand db logger
 )
 |> ignore
 
 host.AddSlashCommand (
     "wordcount",
     "This command shows how many times the the supplied word has been used by a user.",
-    SlashCommands.wordCountCommand ctx
+    SlashCommands.wordCountCommand db logger
 )
 |> ignore
 
 host.AddSlashCommand (
     "giveuserpoint",
     "This command gives a user a point, if Træmand deems they deserve it.",
-    SlashCommands.giveUserPointCommand ctx
+    SlashCommands.giveUserPointCommand db logger
 )
 |> ignore
 
 host.AddSlashCommand (
     "giveuserpointwithwords",
     "This command gives a user a point, if Træmand deems they deserve it.",
-    SlashCommands.giveUserPointWithWordsCommand ctx
+    SlashCommands.giveUserPointWithWordsCommand db logger
 )
 |> ignore
 
-host.AddSlashCommand ("topwords", "This command shows top 5 words for a given user", SlashCommands.topWordsCommand ctx)
+host.AddSlashCommand ("topwords", "This command shows top 5 words for a given user", SlashCommands.topWordsCommand db logger)
 |> ignore
 
 host.AddSlashCommand (
     "alltimeleaderboard",
     "This command shows the all time leaderboard, and stats for the last 3 months.",
-    SlashCommands.allTimeLeaderboardCommand ctx gatewayClient
+    SlashCommands.allTimeLeaderboardCommand db logger channelId gatewayClient
 )
 |> ignore
 
 host.AddSlashCommand (
     "removepointfromuser",
     "This command removes a point from a user, if Træmand deems it necessary.",
-    SlashCommands.removePointCommand ctx
+    SlashCommands.removePointCommand db logger
 )
 |> ignore
 

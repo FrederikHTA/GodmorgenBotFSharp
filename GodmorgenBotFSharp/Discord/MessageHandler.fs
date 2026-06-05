@@ -3,6 +3,7 @@ module GodmorgenBotFSharp.MessageHandler
 open System
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
+open MongoDB.Driver
 open NetCord.Gateway
 
 let private buildGreeting (authorId : uint64) =
@@ -11,40 +12,39 @@ let private buildGreeting (authorId : uint64) =
     else
         $"Godmorgen <@{authorId}>! :sun_with_face:"
 
-let private processGodmorgenMessage (ctx : Context) (message : Message) (godmorgenMessage : Domain.GodmorgenMessage) =
+let private processGodmorgenMessage (db : IMongoDatabase) (message : Message) (godmorgenMessage : Domain.GodmorgenMessage) =
     task {
         let! pointRecorded =
-            MongoDb.Functions.recordDailyGodmorgen message.Author DateTimeOffset.UtcNow ctx.MongoDataBase
+            MongoDb.Functions.recordDailyGodmorgen message.Author DateTimeOffset.UtcNow db
 
         if pointRecorded then
-            do! MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord ctx.MongoDataBase
+            do! MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord db
 
             let! _ = message.ReplyAsync (buildGreeting message.Author.Id)
             ()
     }
 
-let onDiscordMessage (ctx : Context) (message : Message) : ValueTask =
+let onDiscordMessage (db : IMongoDatabase) (logger : ILogger) (timeZone : TimeZoneInfo) (message : Message) : ValueTask =
     task {
         let utcNow = DateTimeOffset.UtcNow
 
         if
             message.Author.IsBot
-            || Validation.isWeekend ctx.TimeZone utcNow
-            || not (Validation.isWithinGodmorgenHours ctx.TimeZone utcNow)
+            || Validation.isWeekend timeZone utcNow
+            || not (Validation.isWithinGodmorgenHours timeZone utcNow)
         then
             return ()
         else
-            ctx.Logger.LogInformation (
+            logger.LogInformation (
                 "Processing godmorgen message: '{Message}' from '{User}'",
                 message.Content,
                 message.Author.Username
             )
 
-
             match Validation.parseGodmorgenMessage message.Content with
-            | Ok godmorgenMessage -> do! processGodmorgenMessage ctx message godmorgenMessage
+            | Ok godmorgenMessage -> do! processGodmorgenMessage db message godmorgenMessage
             | Error validationError ->
-                ctx.Logger.LogError (
+                logger.LogError (
                     "Failed to parse godmorgen words from message: '{Message}' from '{User}', error: '{Error}'",
                     message.Content,
                     message.Author.Username,

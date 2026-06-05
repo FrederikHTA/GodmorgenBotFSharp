@@ -11,7 +11,6 @@
 
     <ItemGroup>
 <Compile Include="Constants.fs" />
-        <Compile Include="Context.fs" />
         <Compile Include="Domain.fs" />
         <Compile Include="Leaderboard.fs" />
         <Compile Include="Validation.fs" />

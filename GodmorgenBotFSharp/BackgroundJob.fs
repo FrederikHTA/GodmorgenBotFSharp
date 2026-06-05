@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
+open MongoDB.Driver
 open NetCord.Gateway
 
 let private calculateNextRunAtUtc (timeZone : TimeZoneInfo) (nowUtc : DateTimeOffset) : DateTimeOffset =
@@ -18,11 +19,11 @@ let private calculateNextRunAtUtc (timeZone : TimeZoneInfo) (nowUtc : DateTimeOf
     let nextRunUtc = TimeZoneInfo.ConvertTimeToUtc (nextRunInRst, timeZone)
     DateTimeOffset (nextRunUtc, TimeSpan.Zero)
 
-let private findAndDisgraceHeretics (gatewayClient : GatewayClient) (context : Context) =
+let private findAndDisgraceHeretics (db : IMongoDatabase) (logger : ILogger) (channelId : uint64) (gatewayClient : GatewayClient) =
     task {
-        context.Logger.LogInformation "Running heresy check"
+        logger.LogInformation "Running heresy check"
         let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
-        let! hereticUserIds = context.MongoDataBase |> MongoDb.Functions.getHereticUserIds todayUtc
+        let! hereticUserIds = db |> MongoDb.Functions.getHereticUserIds todayUtc
 
         if hereticUserIds.Length > 0 then
             let mentions =
@@ -32,46 +33,46 @@ let private findAndDisgraceHeretics (gatewayClient : GatewayClient) (context : C
 
             let message = $"User(s) found guilty of heresy: %s{mentions}"
 
-            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) :> Task
+            do! gatewayClient.Rest.SendMessageAsync (channelId, message) :> Task
         else
             let message = "No heretics found today. All hail the righteous!"
-            context.Logger.LogInformation "No heretics found."
+            logger.LogInformation "No heretics found."
 
-            do! gatewayClient.Rest.SendMessageAsync (context.DiscordChannelInfo.ChannelId, message) :> Task
+            do! gatewayClient.Rest.SendMessageAsync (channelId, message) :> Task
     }
 
-type HereticBackgroundJob (context : Context, gatewayClient : GatewayClient) =
+type HereticBackgroundJob (db : IMongoDatabase, logger : ILogger<HereticBackgroundJob>, channelId : uint64, timeZone : TimeZoneInfo, gatewayClient : GatewayClient) =
     inherit BackgroundService ()
 
     override _.ExecuteAsync (token : CancellationToken) =
         task {
-            context.Logger.LogInformation "HereticBackgroundJob has been started!"
+            logger.LogInformation "HereticBackgroundJob has been started!"
 
             try
                 while not token.IsCancellationRequested do
                     let nowUtc = DateTimeOffset.UtcNow
-                    let nextRunAtUtc = calculateNextRunAtUtc context.TimeZone nowUtc
+                    let nextRunAtUtc = calculateNextRunAtUtc timeZone nowUtc
                     let delay = nextRunAtUtc - nowUtc
 
-                    context.Logger.LogInformation (
+                    logger.LogInformation (
                         "Next heresy check scheduled for {RunAtUtc} UTC ({RunAtRst} RST)",
                         nextRunAtUtc,
-                        TimeZoneInfo.ConvertTime (nextRunAtUtc, context.TimeZone)
+                        TimeZoneInfo.ConvertTime (nextRunAtUtc, timeZone)
                     )
 
                     do! Task.Delay (delay, token)
 
                     let runNowUtc = DateTimeOffset.UtcNow
 
-                    if not (Validation.isWeekend context.TimeZone runNowUtc) then
+                    if not (Validation.isWeekend timeZone runNowUtc) then
                         try
-                            do! findAndDisgraceHeretics gatewayClient context
+                            do! findAndDisgraceHeretics db logger channelId gatewayClient
                         with ex ->
-                            context.Logger.LogError (ex, "Heresy check failed, continuing with next scheduled run")
+                            logger.LogError (ex, "Heresy check failed, continuing with next scheduled run")
                     else
-                        context.Logger.LogInformation "Skipping heresy check - it's the weekend in RST"
+                        logger.LogInformation "Skipping heresy check - it's the weekend in RST"
             with :? OperationCanceledException when token.IsCancellationRequested ->
-                context.Logger.LogInformation "HereticBackgroundJob cancellation requested."
+                logger.LogInformation "HereticBackgroundJob cancellation requested."
 
-            context.Logger.LogInformation "HereticBackgroundJob is stopping."
+            logger.LogInformation "HereticBackgroundJob is stopping."
         }
