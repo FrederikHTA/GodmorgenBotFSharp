@@ -110,24 +110,7 @@ This is very important when doing interop with .NET libraries that use nullable 
 ## 3. Formatting & Syntax
 
 ### 3.1 Type Annotations
-**Rule**: Use generic syntax `List<'T>` and `Option<'T>`.
-**Rule**: Use `Array<'T>` from `AutoOpen.fs`, not lowercase `array<'T>` or `'T[]`.
 **Rule**: Public functions should always have type annotations.
-**Forbid**: Postfix syntax `string list` or `int option`.
-
-**Bad:**
-```fsharp
-let names: string list = []
-let items: string array = [||]
-```
-
-**Good:**
-```fsharp
-open AutoOpen.fs
-
-let names: List<string> = []
-let items: Array<string> = [||]
-```
 
 ### 3.2 Pipelining
 **Rule**: Use the forward pipe `|>` freely.
@@ -194,7 +177,7 @@ let calculateInterest ...
 
 ### 4.4 Function Structure
 **Rule**: Structure functions with assertions first if necessary. Then do error handling with break out early concept. At last, handle success cases.
-**Rule**: Functions should generally avoid branching logic. Use `Result` or `Option` to handle errors gracefully.
+**Rule**: Functions should generally avoid branching logic.
 **Rule**: Use `Result` or `Option` to handle errors gracefully.
 
 ---
