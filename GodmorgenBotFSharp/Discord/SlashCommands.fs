@@ -41,7 +41,7 @@ let wordCountCommand (db : IMongoDatabase) (logger : ILogger) =
 
             match gWordResult, mWordResult with
             | Ok gWord, Ok mWord ->
-                let! wordCounts = MongoDb.Functions.getWordCount user gWord mWord db
+                let! wordCounts = MongoDb.Functions.getWordCount user.Id gWord mWord db
 
                 return
                     $"The user <@{user.Id}> has used the word {gWordStr} {wordCounts.GWord.Count} times "
@@ -73,9 +73,9 @@ let giveUserPointWithWordsCommand (db : IMongoDatabase) (logger : ILogger) =
 
                     match gWordResult, mWordResult with
                     | Ok gWord, Ok mWord ->
-                        let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user db
+                        let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user.Id db
 
-                        do! MongoDb.Functions.updateWordCount user gWord mWord db
+                        do! MongoDb.Functions.updateWordCount user.Id gWord mWord db
 
                         return
                             $"User <@{user.Id}> has been given a point from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!, "
@@ -100,7 +100,7 @@ let giveUserPointCommand (db : IMongoDatabase) (logger : ILogger) =
                         commandContext.User.Username
                     )
 
-                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user db
+                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.giveUserPoint user.Id db
 
                     return
                         $"User <@{user.Id}> has been given a point from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
@@ -122,7 +122,7 @@ let removePointCommand (db : IMongoDatabase) (logger : ILogger) =
                         commandContext.User.Username
                     )
 
-                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.removeUserPoint user db
+                    let! prevAndCurrentGodmorgenCount = MongoDb.Functions.removeUserPoint user.Id db
 
                     return
                         $"User <@{user.Id}> has had a point removed from {prevAndCurrentGodmorgenCount.Previous} to {prevAndCurrentGodmorgenCount.Current} points!"
@@ -137,7 +137,7 @@ let topWordsCommand (db : IMongoDatabase) (logger : ILogger) =
         task {
             logger.LogInformation ("Got topwords command request for {User}", user.Username)
 
-            let! top5WordsO = MongoDb.Functions.getTop5Words user db
+            let! top5WordsO = MongoDb.Functions.getTop5Words user.Id db
 
             match top5WordsO with
             | Some top5Words when not (Array.isEmpty top5Words) ->
@@ -154,9 +154,38 @@ let topWordsCommand (db : IMongoDatabase) (logger : ILogger) =
         }
     )
 
+type SetVacationDelegate =
+    delegate of
+        commandContext : ApplicationCommandContext * user : NetCord.User * startDate : string * endDate : string ->
+            Task<string>
+
+let setVacationCommand (db : IMongoDatabase) (logger : ILogger) =
+    SetVacationDelegate (fun commandContext user startDateStr endDateStr ->
+        requireAdmin
+            commandContext
+            (fun () ->
+                task {
+                    logger.LogInformation ("Got setvacation command for {User}", user.Username)
+
+                    match DateOnly.TryParse startDateStr, DateOnly.TryParse endDateStr with
+                    | (true, startDate), (true, endDate) when startDate <= endDate ->
+                        do! MongoDb.Functions.upsertVacation user.Id startDate endDate db
+                        return $"Vacation set for <@{user.Id}> from {startDate} to {endDate}."
+                    | (false, _), _ -> return "Invalid start date. Use format YYYY-MM-DD."
+                    | _, (false, _) -> return "Invalid end date. Use format YYYY-MM-DD."
+                    | _ -> return "Start date must be before or equal to end date."
+                }
+            )
+    )
+
 type AllTimeLeaderboardDelegate = delegate of unit -> Task<string>
 
-let allTimeLeaderboardCommand (db : IMongoDatabase) (logger : ILogger) (channelId : uint64) (gatewayClient : GatewayClient) =
+let allTimeLeaderboardCommand
+    (db : IMongoDatabase)
+    (logger : ILogger)
+    (channelId : uint64)
+    (gatewayClient : GatewayClient)
+    =
     AllTimeLeaderboardDelegate (fun _ ->
         task {
             logger.LogInformation "Got alltimeleaderboard command request"

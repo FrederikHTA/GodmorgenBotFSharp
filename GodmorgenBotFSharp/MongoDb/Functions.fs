@@ -13,15 +13,18 @@ let private mongoDatabaseName : string = "godmorgen"
 [<Literal>]
 let internal godmorgenStatsCollectionName : string = "godmorgen_stats"
 
+[<Literal>]
+let private vacationCollectionName : string = "vacations"
+
 let createDatabase (connectionString : string) : IMongoDatabase =
     let mongoClient = new MongoClient (connectionString)
     mongoClient.GetDatabase mongoDatabaseName
 
-let createUser (mongoDatabase : IMongoDatabase) (userId : uint64) (userName : string) : Task<Types.GodmorgenStats> =
+let createUser (mongoDatabase : IMongoDatabase) (userId : uint64) : Task<Types.GodmorgenStats> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let newUser = Types.GodmorgenStats.create userId userName
+        let newUser = Types.GodmorgenStats.create userId
         do! collection.InsertOneAsync newUser
         return newUser
     }
@@ -55,14 +58,11 @@ let getGodmorgenStats
         | None -> return None
     }
 
-let removeUserPoint
-    (user : NetCord.User)
-    (mongoDatabase : IMongoDatabase)
-    : Task<Types.PreviousAndCurrentGodmorgenCount> =
+let removeUserPoint (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.PreviousAndCurrentGodmorgenCount> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let! godmorgenStatO = getGodmorgenStat user.Id mongoDatabase
+        let! godmorgenStatO = getGodmorgenStat userId mongoDatabase
 
         match godmorgenStatO with
         | None ->
@@ -76,7 +76,7 @@ let removeUserPoint
             let updatedGodmorgenStats =
                 godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount |> Mapper.fromDomain
 
-            let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
+            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime DateTime.UtcNow)
 
             do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
 
@@ -88,18 +88,15 @@ let removeUserPoint
             return godmorgenCounts
     }
 
-let giveUserPoint
-    (user : NetCord.User)
-    (mongoDatabase : IMongoDatabase)
-    : Task<Types.PreviousAndCurrentGodmorgenCount> =
+let giveUserPoint (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.PreviousAndCurrentGodmorgenCount> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
-        let! godmorgenStatO = getGodmorgenStat user.Id mongoDatabase
+        let! godmorgenStatO = getGodmorgenStat userId mongoDatabase
 
         match godmorgenStatO with
         | None ->
-            let! newUser = createUser mongoDatabase user.Id user.Username
+            let! newUser = createUser mongoDatabase userId
 
             let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
                 Previous = 0
@@ -114,7 +111,7 @@ let giveUserPoint
                 |> Domain.GodmorgenStats.incrementGodmorgenCount
                 |> Mapper.fromDomain
 
-            let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime DateTime.UtcNow)
+            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime DateTime.UtcNow)
 
             do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
 
@@ -127,13 +124,13 @@ let giveUserPoint
     }
 
 let updateWordCount
-    (user : NetCord.User)
+    (userId : uint64)
     (gWord : Domain.GWord)
     (mWord : Domain.MWord)
     (mongoDatabase : IMongoDatabase)
     : Task =
     task {
-        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"
+        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{userId}"
         let options = UpdateOptions (IsUpsert = true)
 
         let upsertWord (word : string) =
@@ -173,7 +170,7 @@ let getHereticUserIds (utcNow : DateOnly) (mongoDatabase : IMongoDatabase) : Tas
     }
 
 let getWordCount
-    (user : NetCord.User)
+    (userId : uint64)
     (gWord : Domain.GWord)
     (mWord : Domain.MWord)
     (mongoDatabase : IMongoDatabase)
@@ -181,7 +178,7 @@ let getWordCount
     task {
         let gWordVal = Domain.GWord.value gWord
         let mWordVal = Domain.MWord.value mWord
-        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"
+        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{userId}"
 
         let filter = Builders<Types.WordCount>.Filter.In (_.Word, [| gWordVal ; mWordVal |])
 
@@ -206,9 +203,9 @@ let getWordCount
         return wordCounts
     }
 
-let recordDailyGodmorgen (user : NetCord.User) (utcNow : DateTimeOffset) (mongoDatabase : IMongoDatabase) : Task<bool> =
+let recordDailyGodmorgen (userId : uint64) (utcNow : DateTimeOffset) (mongoDatabase : IMongoDatabase) : Task<bool> =
     task {
-        let! statO = getGodmorgenStat user.Id mongoDatabase
+        let! statO = getGodmorgenStat userId mongoDatabase
 
         match statO with
         | Some stat when Domain.GodmorgenStats.hasWrittenGodmorgenToday utcNow stat -> return false
@@ -221,11 +218,11 @@ let recordDailyGodmorgen (user : NetCord.User) (utcNow : DateTimeOffset) (mongoD
                 |> Domain.GodmorgenStats.incrementGodmorgenCount
                 |> Mapper.fromDomain
 
-            let mongoId = Types.GodmorgenStats.createMongoId user.Id (DateOnly.FromDateTime utcNow.UtcDateTime)
+            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime utcNow.UtcDateTime)
             do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updated) |> Task.ignore
             return true
         | None ->
-            do! createUser mongoDatabase user.Id user.Username |> Task.ignore
+            do! createUser mongoDatabase userId |> Task.ignore
             return true
     }
 
@@ -246,13 +243,49 @@ let getStatsByMonth
 let getAllStats (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
     getGodmorgenStats Builders<Types.GodmorgenStats>.Filter.Empty mongoDatabase
 
-let getTop5Words (user : NetCord.User) (mongoDatabase : IMongoDatabase) : Task<Types.WordCount array option> =
+let getTop5Words (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.WordCount array option> =
     task {
-        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{user.Id}"
+        let collection = mongoDatabase.GetCollection<Types.WordCount> $"word_count_{userId}"
 
         let! results =
             collection.Find(fun _ -> true).SortByDescending(_.Count).Limit(5).ToListAsync ()
             |> Task.map Option.ofObj
 
         return results |> Option.map Seq.toArray
+    }
+
+let upsertVacation
+    (userId : uint64)
+    (startDate : DateOnly)
+    (endDate : DateOnly)
+    (mongoDatabase : IMongoDatabase)
+    : Task =
+    task {
+        let collection = mongoDatabase.GetCollection<Types.Vacation> vacationCollectionName
+
+        let vacation : Types.Vacation = {
+            Id = string userId
+            DiscordUserId = userId
+            StartDate = startDate.ToDateTime (TimeOnly.MinValue, DateTimeKind.Utc) |> DateTimeOffset
+            EndDate = endDate.ToDateTime (TimeOnly.MaxValue, DateTimeKind.Utc) |> DateTimeOffset
+        }
+
+        let options = ReplaceOptions (IsUpsert = true)
+        do! collection.ReplaceOneAsync ((fun x -> x.Id = string userId), vacation, options) |> Task.ignore
+    }
+
+let getVacationingUserIds (utcToday : DateOnly) (mongoDatabase : IMongoDatabase) : Task<uint64 Set> =
+    task {
+        let collection = mongoDatabase.GetCollection<Types.Vacation> vacationCollectionName
+        let todayStart = utcToday.ToDateTime (TimeOnly.MinValue, DateTimeKind.Utc) |> DateTimeOffset
+
+        let filter =
+            Builders<Types.Vacation>.Filter
+                .And (
+                    Builders<Types.Vacation>.Filter.Lte (_.StartDate, todayStart),
+                    Builders<Types.Vacation>.Filter.Gte (_.EndDate, todayStart)
+                )
+
+        let! results = collection.Find(filter).ToListAsync () |> Task.map Option.ofObj
+        return results |> Option.map (Seq.map _.DiscordUserId >> Set.ofSeq) |> Option.defaultValue Set.empty
     }

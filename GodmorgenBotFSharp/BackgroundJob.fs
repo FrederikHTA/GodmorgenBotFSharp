@@ -19,15 +19,35 @@ let private calculateNextRunAtUtc (timeZone : TimeZoneInfo) (nowUtc : DateTimeOf
     let nextRunUtc = TimeZoneInfo.ConvertTimeToUtc (nextRunInRst, timeZone)
     DateTimeOffset (nextRunUtc, TimeSpan.Zero)
 
-let private findAndDisgraceHeretics (db : IMongoDatabase) (logger : ILogger) (channelId : uint64) (gatewayClient : GatewayClient) =
+let private findAndDisgraceHeretics
+    (db : IMongoDatabase)
+    (logger : ILogger)
+    (channelId : uint64)
+    (gatewayClient : GatewayClient)
+    =
     task {
         logger.LogInformation "Running heresy check"
-        let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
+        let utcNow = DateTimeOffset.UtcNow
+        let todayUtc = DateOnly.FromDateTime utcNow.UtcDateTime
         let! hereticUserIds = db |> MongoDb.Functions.getHereticUserIds todayUtc
+        let! vacationingSet = MongoDb.Functions.getVacationingUserIds todayUtc db
 
-        if hereticUserIds.Length > 0 then
+        let usersOnVacation =
+            hereticUserIds
+            |> Array.map Domain.DiscordUserId.value
+            |> Array.filter (fun id -> Set.contains id vacationingSet)
+
+        for userId in usersOnVacation do
+            let! _ = MongoDb.Functions.recordDailyGodmorgen userId utcNow db
+            ()
+
+        let guiltyHereticIds =
+            hereticUserIds
+            |> Array.filter (fun id -> not (Set.contains (Domain.DiscordUserId.value id) vacationingSet))
+
+        if guiltyHereticIds.Length > 0 then
             let mentions =
-                hereticUserIds
+                guiltyHereticIds
                 |> Array.map (fun discordUserId -> $"<@%d{Domain.DiscordUserId.value discordUserId}>")
                 |> String.concat ", "
 
@@ -41,7 +61,14 @@ let private findAndDisgraceHeretics (db : IMongoDatabase) (logger : ILogger) (ch
             do! gatewayClient.Rest.SendMessageAsync (channelId, message) :> Task
     }
 
-type HereticBackgroundJob (db : IMongoDatabase, logger : ILogger<HereticBackgroundJob>, channelId : uint64, timeZone : TimeZoneInfo, gatewayClient : GatewayClient) =
+type HereticBackgroundJob
+    (
+        db : IMongoDatabase,
+        logger : ILogger<HereticBackgroundJob>,
+        channelId : uint64,
+        timeZone : TimeZoneInfo,
+        gatewayClient : GatewayClient
+    ) =
     inherit BackgroundService ()
 
     override _.ExecuteAsync (token : CancellationToken) =

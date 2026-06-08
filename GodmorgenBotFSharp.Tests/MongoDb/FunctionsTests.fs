@@ -56,7 +56,7 @@ let ``getHereticUserIds - filters stale users in current month`` () : Task =
             let staleInCurrentMonth : Types.GodmorgenStats = {
                 Id = "11_stale"
                 DiscordUserId = 11UL
-                DiscordUsername = "stale-user"
+
                 LastGoodmorgenDate = oldDate
                 GodmorgenCount = 2
                 GodmorgenStreak = 1
@@ -67,7 +67,7 @@ let ``getHereticUserIds - filters stale users in current month`` () : Task =
             let currentDayUser : Types.GodmorgenStats = {
                 Id = "12_today"
                 DiscordUserId = 12UL
-                DiscordUsername = "today-user"
+
                 LastGoodmorgenDate = nowUtc
                 GodmorgenCount = 7
                 GodmorgenStreak = 2
@@ -78,7 +78,7 @@ let ``getHereticUserIds - filters stale users in current month`` () : Task =
             let staleOtherMonth : Types.GodmorgenStats = {
                 Id = "13_other_month"
                 DiscordUserId = 13UL
-                DiscordUsername = "other-month-user"
+
                 LastGoodmorgenDate = oldDate
                 GodmorgenCount = 4
                 GodmorgenStreak = 1
@@ -105,7 +105,7 @@ let ``getHereticUserIds - returns distinct user ids`` () : Task =
             let duplicatedUserA : Types.GodmorgenStats = {
                 Id = "21_dup_a"
                 DiscordUserId = 21UL
-                DiscordUsername = "dup-user"
+
                 LastGoodmorgenDate = oldDate
                 GodmorgenCount = 1
                 GodmorgenStreak = 1
@@ -116,7 +116,7 @@ let ``getHereticUserIds - returns distinct user ids`` () : Task =
             let duplicatedUserB : Types.GodmorgenStats = {
                 Id = "21_dup_b"
                 DiscordUserId = 21UL
-                DiscordUsername = "dup-user-second-doc"
+
                 LastGoodmorgenDate = oldDate
                 GodmorgenCount = 2
                 GodmorgenStreak = 2
@@ -127,7 +127,7 @@ let ``getHereticUserIds - returns distinct user ids`` () : Task =
             let uniqueUser : Types.GodmorgenStats = {
                 Id = "22_unique"
                 DiscordUserId = 22UL
-                DiscordUsername = "unique-user"
+
                 LastGoodmorgenDate = oldDate
                 GodmorgenCount = 1
                 GodmorgenStreak = 1

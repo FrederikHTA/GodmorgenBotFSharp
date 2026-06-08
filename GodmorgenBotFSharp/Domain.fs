@@ -3,7 +3,6 @@ namespace GodmorgenBotFSharp.Domain
 open System
 
 type ValidationError =
-    | InvalidUsername
     | InvalidCount
     | InvalidStreak
     | EmptyWord
@@ -17,20 +16,6 @@ module DiscordUserId =
         DiscordUserId id
 
     let value (DiscordUserId id) = id
-
-type DiscordUsername = private DiscordUsername of string
-
-module DiscordUsername =
-    let create (name : string) : Result<DiscordUsername, ValidationError> =
-        if String.IsNullOrWhiteSpace name then
-            Error ValidationError.InvalidUsername
-        else
-            Ok (DiscordUsername name)
-
-    let createUnsafe (name : string) =
-        DiscordUsername name
-
-    let value (DiscordUsername name) = name
 
 type GodmorgenCount = private GodmorgenCount of int
 
@@ -105,16 +90,14 @@ type GodmorgenMessage = {
 
 type GodmorgenStats = {
     UserId : DiscordUserId
-    Username : DiscordUsername
     LastGodmorgenDate : DateTimeOffset
     Count : GodmorgenCount
     Streak : GodmorgenStreak
 }
 
 module GodmorgenStats =
-    let create (userId : DiscordUserId) (username : DiscordUsername) (now : DateTimeOffset) = {
+    let create (userId : DiscordUserId) (now : DateTimeOffset) = {
         UserId = userId
-        Username = username
         LastGodmorgenDate = now
         Count = GodmorgenCount.createUnsafe 1
         Streak = GodmorgenStreak.createUnsafe 1
@@ -123,8 +106,10 @@ module GodmorgenStats =
     let hasWrittenGodmorgenToday (now : DateTimeOffset) (stats : GodmorgenStats) =
         stats.LastGodmorgenDate.Date = now.Date
 
-    let updateLastGodmorgenDate (now : DateTimeOffset) (stats : GodmorgenStats) : GodmorgenStats =
-        { stats with LastGodmorgenDate = now }
+    let updateLastGodmorgenDate (now : DateTimeOffset) (stats : GodmorgenStats) : GodmorgenStats = {
+        stats with
+            LastGodmorgenDate = now
+    }
 
     let incrementGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
         stats with
@@ -132,9 +117,8 @@ module GodmorgenStats =
             Streak = GodmorgenStreak.increment stats.Streak
     }
 
-    let decreaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats =
-        {
-            stats with
-                Count = GodmorgenCount.decrement stats.Count
-                Streak = GodmorgenStreak.decrement stats.Streak
-        }
+    let decreaseGodmorgenCount (stats : GodmorgenStats) : GodmorgenStats = {
+        stats with
+            Count = GodmorgenCount.decrement stats.Count
+            Streak = GodmorgenStreak.decrement stats.Streak
+    }

@@ -12,7 +12,6 @@ let private mar = DateTimeOffset (2024, 3, 15, 7, 0, 0, TimeSpan.Zero)
 
 let private mkStats (userId : uint64) (count : int) (date : DateTimeOffset) : GodmorgenStats = {
     UserId = DiscordUserId.create userId
-    Username = DiscordUsername.createUnsafe "user"
     LastGodmorgenDate = date
     Count = GodmorgenCount.createUnsafe count
     Streak = GodmorgenStreak.createUnsafe 1

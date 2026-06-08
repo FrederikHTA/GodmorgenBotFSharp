@@ -7,7 +7,6 @@ type GodmorgenStats = {
     [<BsonId>]
     Id : string
     DiscordUserId : uint64
-    DiscordUsername : string
     LastGoodmorgenDate : DateTimeOffset
     GodmorgenCount : int
     GodmorgenStreak : int
@@ -19,13 +18,12 @@ module GodmorgenStats =
     let createMongoId (userId : uint64) (date : DateOnly) : string =
         $"{userId}_{date.Month}_{date.Year}"
 
-    let create (userId : uint64) (userName : string) : GodmorgenStats =
+    let create (userId : uint64) : GodmorgenStats =
         let utcNow = DateTimeOffset.UtcNow
 
         {
             Id = createMongoId userId (DateOnly.FromDateTime utcNow.UtcDateTime)
             DiscordUserId = userId
-            DiscordUsername = userName
             LastGoodmorgenDate = utcNow
             GodmorgenCount = 1
             GodmorgenStreak = 1
@@ -50,6 +48,14 @@ module WordCount =
         Word = word
         Count = count
     }
+
+type Vacation = {
+    [<BsonId>]
+    Id : string // string representation of DiscordUserId
+    DiscordUserId : uint64
+    StartDate : DateTimeOffset
+    EndDate : DateTimeOffset
+}
 
 type PreviousAndCurrentGodmorgenCount = {
     Previous : int

@@ -12,19 +12,27 @@ let private buildGreeting (authorId : uint64) =
     else
         $"Godmorgen <@{authorId}>! :sun_with_face:"
 
-let private processGodmorgenMessage (db : IMongoDatabase) (message : Message) (godmorgenMessage : Domain.GodmorgenMessage) =
+let private processGodmorgenMessage
+    (db : IMongoDatabase)
+    (message : Message)
+    (godmorgenMessage : Domain.GodmorgenMessage)
+    =
     task {
-        let! pointRecorded =
-            MongoDb.Functions.recordDailyGodmorgen message.Author DateTimeOffset.UtcNow db
+        let! pointRecorded = MongoDb.Functions.recordDailyGodmorgen message.Author.Id DateTimeOffset.UtcNow db
 
         if pointRecorded then
-            do! MongoDb.Functions.updateWordCount message.Author godmorgenMessage.GWord godmorgenMessage.MWord db
+            do! MongoDb.Functions.updateWordCount message.Author.Id godmorgenMessage.GWord godmorgenMessage.MWord db
 
             let! _ = message.ReplyAsync (buildGreeting message.Author.Id)
             ()
     }
 
-let onDiscordMessage (db : IMongoDatabase) (logger : ILogger) (timeZone : TimeZoneInfo) (message : Message) : ValueTask =
+let onDiscordMessage
+    (db : IMongoDatabase)
+    (logger : ILogger)
+    (timeZone : TimeZoneInfo)
+    (message : Message)
+    : ValueTask =
     task {
         let utcNow = DateTimeOffset.UtcNow
 

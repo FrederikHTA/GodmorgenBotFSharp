@@ -17,9 +17,7 @@ let private parseChannelId (configuration : IConfiguration) =
         | true, parsed -> Some parsed
         | false, _ -> None
     )
-    |> Option.defaultWith (fun () ->
-        failwith "'ChannelId' is missing or not a valid uint64 in configuration."
-    )
+    |> Option.defaultWith (fun () -> failwith "'ChannelId' is missing or not a valid uint64 in configuration.")
 
 let configureServices (_ : HostBuilderContext) (serviceCollection : IServiceCollection) =
     serviceCollection.AddDiscordGateway (fun options ->
@@ -105,7 +103,11 @@ host.AddSlashCommand (
 )
 |> ignore
 
-host.AddSlashCommand ("topwords", "This command shows top 5 words for a given user", SlashCommands.topWordsCommand db logger)
+host.AddSlashCommand (
+    "topwords",
+    "This command shows top 5 words for a given user",
+    SlashCommands.topWordsCommand db logger
+)
 |> ignore
 
 host.AddSlashCommand (
@@ -119,6 +121,13 @@ host.AddSlashCommand (
     "removepointfromuser",
     "This command removes a point from a user, if Træmand deems it necessary.",
     SlashCommands.removePointCommand db logger
+)
+|> ignore
+
+host.AddSlashCommand (
+    "setvacation",
+    "Sets a vacation period for a user so they are exempt from the heresy check.",
+    SlashCommands.setVacationCommand db logger
 )
 |> ignore
 
