@@ -39,12 +39,12 @@ type WordCount = {
 }
 
 module WordCount =
-    let empty word : WordCount = {
+    let empty (word : string) : WordCount = {
         Word = word
         Count = 0
     }
 
-    let create word count : WordCount = {
+    let create (word : string) (count : int) : WordCount = {
         Word = word
         Count = count
     }

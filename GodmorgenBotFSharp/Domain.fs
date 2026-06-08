@@ -2,6 +2,7 @@ namespace GodmorgenBotFSharp.Domain
 
 open System
 
+[<RequireQualifiedAccess>]
 type ValidationError =
     | InvalidCount
     | InvalidStreak
@@ -12,10 +13,10 @@ type ValidationError =
 type DiscordUserId = private DiscordUserId of uint64
 
 module DiscordUserId =
-    let create (id : uint64) =
+    let create (id : uint64) : DiscordUserId =
         DiscordUserId id
 
-    let value (DiscordUserId id) = id
+    let value (DiscordUserId id) : uint64 = id
 
 type GodmorgenCount = private GodmorgenCount of int
 
@@ -26,15 +27,15 @@ module GodmorgenCount =
         else
             Ok (GodmorgenCount count)
 
-    let createUnsafe (count : int) =
+    let createUnsafe (count : int) : GodmorgenCount =
         GodmorgenCount count
 
-    let value (GodmorgenCount count) = count
+    let value (GodmorgenCount count) : int = count
 
-    let increment (GodmorgenCount count) =
+    let increment (GodmorgenCount count) : GodmorgenCount =
         GodmorgenCount (count + 1)
 
-    let decrement (GodmorgenCount count) =
+    let decrement (GodmorgenCount count) : GodmorgenCount =
         GodmorgenCount (Math.Max (0, count - 1))
 
 type GodmorgenStreak = private GodmorgenStreak of int
@@ -46,15 +47,15 @@ module GodmorgenStreak =
         else
             Ok (GodmorgenStreak streak)
 
-    let createUnsafe (streak : int) =
+    let createUnsafe (streak : int) : GodmorgenStreak =
         GodmorgenStreak streak
 
-    let value (GodmorgenStreak streak) = streak
+    let value (GodmorgenStreak streak) : int = streak
 
-    let increment (GodmorgenStreak streak) =
+    let increment (GodmorgenStreak streak) : GodmorgenStreak =
         GodmorgenStreak (streak + 1)
 
-    let decrement (GodmorgenStreak streak) =
+    let decrement (GodmorgenStreak streak) : GodmorgenStreak =
         GodmorgenStreak (Math.Max (0, streak - 1))
 
 type GWord = private GWord of string
@@ -68,7 +69,7 @@ module GWord =
         elif trimmed.[0] <> 'g' then Error ValidationError.InvalidWord
         else Ok (GWord trimmed)
 
-    let value (GWord word) = word
+    let value (GWord word) : string = word
 
 type MWord = private MWord of string
 
@@ -81,7 +82,7 @@ module MWord =
         elif trimmed.[0] <> 'm' then Error ValidationError.InvalidWord
         else Ok (MWord trimmed)
 
-    let value (MWord word) = word
+    let value (MWord word) : string = word
 
 type GodmorgenMessage = {
     GWord : GWord
@@ -96,14 +97,14 @@ type GodmorgenStats = {
 }
 
 module GodmorgenStats =
-    let create (userId : DiscordUserId) (now : DateTimeOffset) = {
+    let create (userId : DiscordUserId) (now : DateTimeOffset) : GodmorgenStats = {
         UserId = userId
         LastGodmorgenDate = now
         Count = GodmorgenCount.createUnsafe 1
         Streak = GodmorgenStreak.createUnsafe 1
     }
 
-    let hasWrittenGodmorgenToday (now : DateTimeOffset) (stats : GodmorgenStats) =
+    let hasWrittenGodmorgenToday (now : DateTimeOffset) (stats : GodmorgenStats) : bool =
         stats.LastGodmorgenDate.Date = now.Date
 
     let updateLastGodmorgenDate (now : DateTimeOffset) (stats : GodmorgenStats) : GodmorgenStats = {
