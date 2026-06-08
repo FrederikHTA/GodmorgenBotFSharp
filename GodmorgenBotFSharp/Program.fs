@@ -126,7 +126,7 @@ host.AddSlashCommand (
 
 host.AddSlashCommand (
     "setvacation",
-    "Sets a vacation period for a user so they are exempt from the heresy check.",
+    "Sets a vacation period for a user so they are exempt from the heresy check. Date format: YYYY-MM-DD.",
     SlashCommands.setVacationCommand db logger
 )
 |> ignore
