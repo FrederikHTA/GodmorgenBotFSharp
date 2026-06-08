@@ -170,7 +170,7 @@ let setVacationCommand (db : IMongoDatabase) (logger : ILogger) =
                     match DateOnly.TryParse startDateStr, DateOnly.TryParse endDateStr with
                     | (true, startDate), (true, endDate) when startDate <= endDate ->
                         do! MongoDb.Functions.upsertVacation user.Id startDate endDate db
-                        return $"Vacation set for <@{user.Id}> from {startDate.ToString("yyyy-MM-dd")} to {endDate.ToString("yyyy-MM-dd")}."
+                        return $"""Vacation set for <@{user.Id}> from {startDate.ToString("yyyy-MM-dd")} to {endDate.ToString("yyyy-MM-dd")}."""
                     | (false, _), _ -> return "Invalid start date. Use format YYYY-MM-DD."
                     | _, (false, _) -> return "Invalid end date. Use format YYYY-MM-DD."
                     | _ -> return "Start date must be before or equal to end date."
