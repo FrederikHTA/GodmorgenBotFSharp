@@ -3,6 +3,7 @@ module GodmorgenBotFSharp.MongoDb.Types
 open System
 open MongoDB.Bson.Serialization.Attributes
 
+[<BsonIgnoreExtraElements>]
 type GodmorgenStats = {
     [<BsonId>]
     Id : string
