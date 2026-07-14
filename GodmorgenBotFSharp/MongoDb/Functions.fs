@@ -61,69 +61,63 @@ let getGodmorgenStats
         | None -> return None
     }
 
-let removeUserPoint (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.PreviousAndCurrentGodmorgenCount> =
+// Owns the id computation and the DTO write for the current month's doc -
+// every caller that mutates a user's stat goes through here instead of
+// re-deriving the mongoId and replace call itself.
+let private replaceCurrentMonthStat
+    (userId : uint64)
+    (utcNow : DateTimeOffset)
+    (mongoDatabase : IMongoDatabase)
+    (updated : Domain.GodmorgenStats)
+    : Task<Types.GodmorgenStats> =
     task {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
+        let updatedDto = Mapper.fromDomain updated
+        let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime utcNow.UtcDateTime)
 
+        do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedDto) |> Task.ignore
+        return updatedDto
+    }
+
+let private toCounts
+    (previous : Domain.GodmorgenStats)
+    (updated : Types.GodmorgenStats)
+    : Types.PreviousAndCurrentGodmorgenCount =
+    {
+        Previous = previous.Count |> Domain.GodmorgenCount.value
+        Current = updated.GodmorgenCount
+    }
+
+let removeUserPoint (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.PreviousAndCurrentGodmorgenCount> =
+    task {
         let! godmorgenStatO = getGodmorgenStat userId mongoDatabase
 
         match godmorgenStatO with
-        | None ->
-            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
-                Previous = 0
-                Current = 0
-            }
-
-            return godmorgenCounts
+        | None -> return ({ Previous = 0 ; Current = 0 } : Types.PreviousAndCurrentGodmorgenCount)
         | Some godmorgenStat ->
-            let updatedGodmorgenStats =
-                godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount |> Mapper.fromDomain
-
-            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime DateTime.UtcNow)
-
-            do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
-
-            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
-                Previous = godmorgenStat.Count |> Domain.GodmorgenCount.value
-                Current = updatedGodmorgenStats.GodmorgenCount
-            }
-
-            return godmorgenCounts
+            let updated = godmorgenStat |> Domain.GodmorgenStats.decreaseGodmorgenCount
+            let! updatedDto = replaceCurrentMonthStat userId DateTimeOffset.UtcNow mongoDatabase updated
+            return toCounts godmorgenStat updatedDto
     }
 
 let giveUserPoint (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.PreviousAndCurrentGodmorgenCount> =
     task {
-        let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
-
         let! godmorgenStatO = getGodmorgenStat userId mongoDatabase
 
         match godmorgenStatO with
         | None ->
             let! newUser = createUser mongoDatabase userId
+            return ({ Previous = 0 ; Current = newUser.GodmorgenCount } : Types.PreviousAndCurrentGodmorgenCount)
+        | Some godmorgenStat ->
+            let utcNow = DateTimeOffset.UtcNow
 
-            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
-                Previous = 0
-                Current = newUser.GodmorgenCount
-            }
-
-            return godmorgenCounts
-        | Some godmorgenStats ->
-            let updatedGodmorgenStats =
-                godmorgenStats
-                |> Domain.GodmorgenStats.updateLastGodmorgenDate DateTimeOffset.UtcNow
+            let updated =
+                godmorgenStat
+                |> Domain.GodmorgenStats.updateLastGodmorgenDate utcNow
                 |> Domain.GodmorgenStats.incrementGodmorgenCount
-                |> Mapper.fromDomain
 
-            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime DateTime.UtcNow)
-
-            do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updatedGodmorgenStats) |> Task.ignore
-
-            let godmorgenCounts : Types.PreviousAndCurrentGodmorgenCount = {
-                Previous = godmorgenStats.Count |> Domain.GodmorgenCount.value
-                Current = updatedGodmorgenStats.GodmorgenCount
-            }
-
-            return godmorgenCounts
+            let! updatedDto = replaceCurrentMonthStat userId utcNow mongoDatabase updated
+            return toCounts godmorgenStat updatedDto
     }
 
 let updateWordCount
@@ -213,16 +207,12 @@ let recordDailyGodmorgen (userId : uint64) (utcNow : DateTimeOffset) (mongoDatab
         match statO with
         | Some stat when Domain.GodmorgenStats.hasWrittenGodmorgenToday utcNow stat -> return false
         | Some stat ->
-            let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
-
             let updated =
                 stat
                 |> Domain.GodmorgenStats.updateLastGodmorgenDate utcNow
                 |> Domain.GodmorgenStats.incrementGodmorgenCount
-                |> Mapper.fromDomain
 
-            let mongoId = Types.GodmorgenStats.createMongoId userId (DateOnly.FromDateTime utcNow.UtcDateTime)
-            do! collection.ReplaceOneAsync ((fun x -> x.Id = mongoId), updated) |> Task.ignore
+            do! replaceCurrentMonthStat userId utcNow mongoDatabase updated |> Task.ignore
             return true
         | None ->
             do! createUser mongoDatabase userId |> Task.ignore

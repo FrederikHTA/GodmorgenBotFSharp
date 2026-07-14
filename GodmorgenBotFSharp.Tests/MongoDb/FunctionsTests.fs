@@ -179,3 +179,55 @@ let ``recordDailyGodmorgen - creates current month doc when none exists (e.g. va
             Expect.isTrue currentMonthStat.IsSome "Expected a current month doc to have been created"
         }
     )
+
+[<Fact>]
+let ``giveUserPoint - increments an existing current month stat`` () : Task =
+    withMongoDatabase (fun database ->
+        task {
+            let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
+
+            let existing : Types.GodmorgenStats = {
+                Id = $"41_{todayUtc.Month}_{todayUtc.Year}"
+                DiscordUserId = 41UL
+
+                LastGoodmorgenDate = DateTimeOffset.UtcNow.AddDays -1.0
+                GodmorgenCount = 3
+                GodmorgenStreak = 2
+                Year = todayUtc.Year
+                Month = todayUtc.Month
+            }
+
+            do! seedGodmorgenStats database [| existing |]
+
+            let! counts = Functions.giveUserPoint 41UL database
+
+            Expect.equal counts.Previous 3 "Previous count should reflect the pre-existing stat"
+            Expect.equal counts.Current 4 "Current count should be incremented by one"
+        }
+    )
+
+[<Fact>]
+let ``removeUserPoint - decrements an existing current month stat`` () : Task =
+    withMongoDatabase (fun database ->
+        task {
+            let todayUtc = DateOnly.FromDateTime DateTime.UtcNow
+
+            let existing : Types.GodmorgenStats = {
+                Id = $"42_{todayUtc.Month}_{todayUtc.Year}"
+                DiscordUserId = 42UL
+
+                LastGoodmorgenDate = DateTimeOffset.UtcNow
+                GodmorgenCount = 3
+                GodmorgenStreak = 2
+                Year = todayUtc.Year
+                Month = todayUtc.Month
+            }
+
+            do! seedGodmorgenStats database [| existing |]
+
+            let! counts = Functions.removeUserPoint 42UL database
+
+            Expect.equal counts.Previous 3 "Previous count should reflect the pre-existing stat"
+            Expect.equal counts.Current 2 "Current count should be decremented by one"
+        }
+    )
