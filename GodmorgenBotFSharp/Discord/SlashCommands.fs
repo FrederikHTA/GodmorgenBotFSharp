@@ -24,8 +24,11 @@ let leaderboardCommand (db : IMongoDatabase) (logger : ILogger) =
             let! result = MongoDb.Functions.getStatsByMonth today.Month today.Year db
 
             match result with
-            | Some stats -> return Leaderboard.getCurrentMonthLeaderboard stats
-            | None -> return "No one has said godmorgen yet this month."
+            | Ok (Some stats) -> return Leaderboard.getCurrentMonthLeaderboard stats
+            | Ok None -> return "No one has said godmorgen yet this month."
+            | Error e ->
+                logger.LogError ("Failed to load leaderboard stats: {Error}", e)
+                return "Failed to load the leaderboard."
         }
     )
 
@@ -192,8 +195,11 @@ let allTimeLeaderboardCommand
             let! result = MongoDb.Functions.getAllStats db
 
             match result with
-            | None -> return "No one has said godmorgen yet."
-            | Some godmorgenStats ->
+            | Error e ->
+                logger.LogError ("Failed to load leaderboard stats: {Error}", e)
+                return "Failed to load the leaderboard."
+            | Ok None -> return "No one has said godmorgen yet."
+            | Ok (Some godmorgenStats) ->
                 let monthlyLeaderboards = Leaderboard.getMonthlyLeaderboards godmorgenStats
                 let overallRankings = Leaderboard.getOverallRankings godmorgenStats
 

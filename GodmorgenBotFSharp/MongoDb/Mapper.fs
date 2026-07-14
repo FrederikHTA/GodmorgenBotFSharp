@@ -2,13 +2,22 @@ module GodmorgenBotFSharp.MongoDb.Mapper
 
 open System
 open GodmorgenBotFSharp
+open FsToolkit.ErrorHandling
 
-let toDomain (dto : Types.GodmorgenStats) : Domain.GodmorgenStats = {
-    UserId = Domain.DiscordUserId.create dto.DiscordUserId
-    LastGodmorgenDate = dto.LastGoodmorgenDate
-    Count = Domain.GodmorgenCount.createUnsafe dto.GodmorgenCount
-    Streak = Domain.GodmorgenStreak.createUnsafe dto.GodmorgenStreak
-}
+let toDomain (dto : Types.GodmorgenStats) : Result<Domain.GodmorgenStats, Domain.ValidationError> =
+    result {
+        let! count = Domain.GodmorgenCount.create dto.GodmorgenCount
+        let! streak = Domain.GodmorgenStreak.create dto.GodmorgenStreak
+
+        let godmorgenStats : Domain.GodmorgenStats = {
+            UserId = Domain.DiscordUserId.create dto.DiscordUserId
+            LastGodmorgenDate = dto.LastGoodmorgenDate
+            Count = count
+            Streak = streak
+        }
+
+        return godmorgenStats
+    }
 
 let fromDomain (domain : Domain.GodmorgenStats) : Types.GodmorgenStats = {
     Id =

@@ -4,6 +4,7 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open GodmorgenBotFSharp
+open GodmorgenBotFSharp.Domain
 open MongoDB.Driver
 open FsToolkit.ErrorHandling
 
@@ -39,21 +40,23 @@ let getGodmorgenStat (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<D
             collection.Find(fun x -> x.Id = mongoId).SingleOrDefaultAsync () |> Task.map Option.ofObj
 
         match godmorgenStatDto with
-        | Some dto -> return dto |> Mapper.toDomain |> Some
+        | Some dto -> return dto |> Mapper.toDomain |> Option.ofResult
         | None -> return None
     }
 
 let getGodmorgenStats
     (filter : FilterDefinition<Types.GodmorgenStats>)
     (mongoDatabase : IMongoDatabase)
-    : Task<Domain.GodmorgenStats array option> =
-    task {
+    : TaskResult<GodmorgenStats array option, ValidationError> =
+    taskResult {
         let collection = mongoDatabase.GetCollection<Types.GodmorgenStats> godmorgenStatsCollectionName
 
         let! godmorgenStatDtos = collection.Find(filter).ToListAsync () |> Task.map Option.ofObj
 
         match godmorgenStatDtos with
-        | Some dtos when dtos.Count > 0 -> return dtos |> Seq.map Mapper.toDomain |> Seq.toArray |> Some
+        | Some dtos when dtos.Count > 0 ->
+            let! godmorgenStats = dtos |> Seq.map Mapper.toDomain |> Seq.sequenceResultM
+            return godmorgenStats |> Some
         | Some _ -> return None
         | None -> return None
     }
@@ -230,7 +233,7 @@ let getStatsByMonth
     (month : int)
     (year : int)
     (mongoDatabase : IMongoDatabase)
-    : Task<Domain.GodmorgenStats array option> =
+    : TaskResult<Domain.GodmorgenStats array option, Domain.ValidationError> =
     let filter =
         Builders<Types.GodmorgenStats>.Filter
             .And (
@@ -240,7 +243,9 @@ let getStatsByMonth
 
     getGodmorgenStats filter mongoDatabase
 
-let getAllStats (mongoDatabase : IMongoDatabase) : Task<Domain.GodmorgenStats array option> =
+let getAllStats
+    (mongoDatabase : IMongoDatabase)
+    : TaskResult<Domain.GodmorgenStats array option, Domain.ValidationError> =
     getGodmorgenStats Builders<Types.GodmorgenStats>.Filter.Empty mongoDatabase
 
 let getTop5Words (userId : uint64) (mongoDatabase : IMongoDatabase) : Task<Types.WordCount array option> =
