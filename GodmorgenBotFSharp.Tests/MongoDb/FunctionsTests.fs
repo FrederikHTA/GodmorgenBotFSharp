@@ -143,3 +143,39 @@ let ``getHereticUserIds - returns distinct user ids`` () : Task =
             Expect.equal actualIds (Set.ofList [ 21UL ; 22UL ]) "Returned heretic ids should be distinct"
         }
     )
+
+[<Fact>]
+let ``recordDailyGodmorgen - creates current month doc when none exists (e.g. vacation spanning month boundary)`` () : Task =
+    withMongoDatabase (fun database ->
+        task {
+            // Simulate a user whose only doc is from last month (as would happen when a
+            // vacation spans a month boundary and the new month's doc was never created).
+            let utcNow = DateTimeOffset.UtcNow
+
+            let lastMonthUtc =
+                DateOnly.FromDateTime (utcNow.UtcDateTime.AddMonths -1)
+
+            let lastMonthDoc : Types.GodmorgenStats = {
+                Id = $"31_{lastMonthUtc.Month}_{lastMonthUtc.Year}"
+                DiscordUserId = 31UL
+
+                LastGoodmorgenDate = utcNow.AddMonths -1
+                GodmorgenCount = 5
+                GodmorgenStreak = 5
+                Year = lastMonthUtc.Year
+                Month = lastMonthUtc.Month
+            }
+
+            do! seedGodmorgenStats database [| lastMonthDoc |]
+
+            let! created = Functions.recordDailyGodmorgen 31UL utcNow database
+
+            Expect.isTrue created "Should report that a godmorgen was recorded"
+
+            // getGodmorgenStat looks up by today's month/year id, so a Some result here
+            // proves the current month's doc now exists (not just last month's).
+            let! currentMonthStat = Functions.getGodmorgenStat 31UL database
+
+            Expect.isTrue currentMonthStat.IsSome "Expected a current month doc to have been created"
+        }
+    )

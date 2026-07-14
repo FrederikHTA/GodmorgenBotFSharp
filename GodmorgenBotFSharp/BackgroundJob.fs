@@ -29,17 +29,16 @@ let private findAndDisgraceHeretics
         logger.LogInformation "Running heresy check"
         let utcNow = DateTimeOffset.UtcNow
         let todayUtc = DateOnly.FromDateTime utcNow.UtcDateTime
-        let! hereticUserIds = db |> MongoDb.Functions.getHereticUserIds todayUtc
         let! vacationingSet = MongoDb.Functions.getVacationingUserIds todayUtc db
 
-        let usersOnVacation =
-            hereticUserIds
-            |> Array.map Domain.DiscordUserId.value
-            |> Array.filter (fun id -> Set.contains id vacationingSet)
-
-        for userId in usersOnVacation do
+        // ponytail: credit every vacationing user directly (not just ones already flagged
+        // heretic this month) so recordDailyGodmorgen's get-or-create also seeds their doc
+        // for a brand new month when their vacation spans the month boundary.
+        for userId in vacationingSet do
             let! _ = MongoDb.Functions.recordDailyGodmorgen userId utcNow db
             ()
+
+        let! hereticUserIds = db |> MongoDb.Functions.getHereticUserIds todayUtc
 
         let guiltyHereticIds =
             hereticUserIds
