@@ -7,6 +7,7 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open MongoDB.Driver
 open NetCord.Gateway
+open FsToolkit.ErrorHandling
 
 let private calculateNextRunAtUtc (timeZone : TimeZoneInfo) (nowUtc : DateTimeOffset) : DateTimeOffset =
     let rstNow = TimeZoneInfo.ConvertTime (nowUtc, timeZone)
@@ -31,12 +32,11 @@ let private findAndDisgraceHeretics
         let todayUtc = DateOnly.FromDateTime utcNow.UtcDateTime
         let! vacationingSet = MongoDb.Functions.getVacationingUserIds todayUtc db
 
-        // ponytail: credit every vacationing user directly (not just ones already flagged
+        // credit every vacationing user directly (not just ones already flagged
         // heretic this month) so recordDailyGodmorgen's get-or-create also seeds their doc
         // for a brand new month when their vacation spans the month boundary.
         for userId in vacationingSet do
-            let! _ = MongoDb.Functions.recordDailyGodmorgen userId utcNow db
-            ()
+            do! MongoDb.Functions.recordDailyGodmorgen userId utcNow db |> Task.ignore
 
         let! hereticUserIds = db |> MongoDb.Functions.getHereticUserIds todayUtc
 
